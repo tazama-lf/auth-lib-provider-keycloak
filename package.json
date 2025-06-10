@@ -1,71 +1,70 @@
 {
-    "name": "@tazama-lf/auth-lib-provider-keycloak",
-    "version": "1.0.0",
-    "description": "Keycloak provider for auth-lib",
-    "main": "lib/index.js",
-    "scripts": {
-      "build": "tsc --project tsconfig.json",
-      "clean": "npx rimraf lib node_modules coverage package-lock.json",
-      "dry": "npm publish --dry-run",
-      "test": "jest --config=jest.config.ts --passWithNoTests",
-      "fix": "npm run fix:prettier && npm run fix:eslint",
-      "fix:eslint": "eslint --fix \"**/*.ts\"",
-      "fix:prettier": "prettier --write \"**/*.ts\"",
-      "lint": "npm run lint:eslint && npm run lint:prettier",
-      "lint:eslint": "eslint \"**/*.ts\"",
-      "lint:eslint-unused": "eslint --report-unused-disable-directives \"**/*.ts\"",
-      "lint:eslint-no-inline": "eslint --no-inline-config \"**/*.ts\"",
-      "lint:prettier": "prettier --check \"**/*.ts\""
-    },
-    "files": [
-      "lib"
-    ],
-    "publishConfig": {
-      "@tazama-lf:registry": "https://npm.pkg.github.com/"
-    },
-    "repository": {
-      "type": "git",
-      "url": "git+https://github.com/tazama-lf/auth-lib-provider-keycloak.git"
-    },
-    "keywords": [
-      "authentication",
-      "keycloak"
-    ],
-    "author": "Len Bekker",
-    "license": "Apache-2.0",
-    "bugs": {
-      "url": "https://github.com/tazama-lf/auth-lib-provider-keycloak/issues"
-    },
-    "homepage": "https://github.com/tazama-lf/auth-lib-provider-keycloak#readme",
-    "devDependencies": {
-      "@stylistic/eslint-plugin": "^2.4.0",
-      "@types/jest": "^29.5.12",
-      "@types/jsonwebtoken": "^9.0.6",
-      "@types/node": "^20.14.11",
-      "@typescript-eslint/eslint-plugin": "^7.13.0",
-      "@typescript-eslint/parser": "^7.13.0",
-      "dotenv": "^16.4.5",
-      "eslint": "^8.57.0",
-      "eslint-config-love": "^52.0.0",
-      "eslint-plugin-eslint-comments": "^3.2.0",
-      "husky": "^9.1.4",
-      "jest": "^29.7.0",
-      "jsonwebtoken": "^9.0.2",
-      "lint-staged": "^15.2.7",
-      "prettier": "^3.3.3",
-      "ts-jest": "^29.2.3",
-      "ts-node": "^10.9.2",
-      "tslib": "^2.6.3",
-      "typescript": "^5.5.4"
-    },
-    "dependencies": {
-      "@tazama-lf/auth-lib": ""
-    },
-    "lint-staged": {
-      "*.{js,ts}": [
-        "eslint --fix",
-        "prettier --write"
-      ]
-    }
+  "name": "@tazama-lf/auth-lib-provider-keycloak",
+  "version": "1.0.0",
+  "description": "Keycloak provider for auth-lib",
+  "main": "lib/index.js",
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "clean": "npx rimraf lib node_modules coverage package-lock.json",
+    "dry": "npm publish --dry-run",
+    "test": "jest --config=jest.config.ts --passWithNoTests",
+    "fix": "npm run fix:prettier && npm run fix:eslint",
+    "fix:eslint": "eslint --fix \"**/*.ts\"",
+    "fix:prettier": "prettier --write \"**/*.ts\"",
+    "lint": "npm run lint:eslint && npm run lint:prettier",
+    "lint:eslint": "eslint \"**/*.ts\"",
+    "lint:eslint-unused": "eslint --report-unused-disable-directives \"**/*.ts\"",
+    "lint:eslint-no-inline": "eslint --no-inline-config \"**/*.ts\"",
+    "lint:prettier": "prettier --check \"**/*.ts\""
+  },
+  "files": [
+    "lib"
+  ],
+  "publishConfig": {
+    "@tazama-lf:registry": "https://npm.pkg.github.com/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tazama-lf/auth-lib-provider-keycloak.git"
+  },
+  "keywords": [
+    "authentication",
+    "keycloak"
+  ],
+  "author": "Len Bekker",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/tazama-lf/auth-lib-provider-keycloak/issues"
+  },
+  "homepage": "https://github.com/tazama-lf/auth-lib-provider-keycloak#readme",
+  "devDependencies": {
+    "@stylistic/eslint-plugin": "^2.4.0",
+    "@types/jest": "^29.5.12",
+    "@types/jsonwebtoken": "^9.0.6",
+    "@types/node": "^20.14.11",
+    "@typescript-eslint/eslint-plugin": "^7.13.0",
+    "@typescript-eslint/parser": "^7.13.0",
+    "dotenv": "^16.4.5",
+    "eslint": "^8.57.0",
+    "eslint-config-love": "^52.0.0",
+    "eslint-plugin-eslint-comments": "^3.2.0",
+    "husky": "^9.1.4",
+    "jest": "^29.7.0",
+    "jsonwebtoken": "^9.0.2",
+    "lint-staged": "^15.2.7",
+    "prettier": "^3.3.3",
+    "ts-jest": "^29.2.3",
+    "ts-node": "^10.9.2",
+    "tslib": "^2.6.3",
+    "typescript": "^5.5.4"
+  },
+  "dependencies": {
+    "@tazama-lf/auth-lib": "^2.0.0"
+  },
+  "lint-staged": {
+    "*.{js,ts}": [
+      "eslint --fix",
+      "prettier --write"
+    ]
   }
-  
+}
