@@ -41,7 +41,7 @@ class KeycloakProvider implements TazamaAuthProvider<[string, string]> {
       headers: myHeaders,
       redirect: 'follow',
     });
-    const resBody = JSON.parse(await res.text());
+    const resBody = JSON.parse(await res.text()) as { access_token: string; token_type: string; refresh_token: string };
 
     const token: KeycloakAuthToken = {
       accessToken: resBody.access_token,
@@ -49,7 +49,7 @@ class KeycloakProvider implements TazamaAuthProvider<[string, string]> {
       refreshToken: resBody.refresh_token,
     };
 
-    return JwtService.signToken(await this.generateTazamaToken(token));
+    return JwtService.signToken(this.generateTazamaToken(token));
   }
 
   /**
@@ -58,7 +58,7 @@ class KeycloakProvider implements TazamaAuthProvider<[string, string]> {
    * @param {KeycloakAuthToken} authToken - The Keycloak authentication token to decode.
    * @returns {Promise<TazamaToken>} - A promise that resolves to a TazamaToken object containing the mapped claims.
    */
-  async generateTazamaToken(authToken: KeycloakAuthToken): Promise<TazamaToken> {
+  generateTazamaToken(authToken: KeycloakAuthToken): TazamaToken {
     const decodedToken = jwt.decode(authToken.accessToken);
 
     if (!decodedToken || typeof decodedToken === 'string') {
@@ -69,10 +69,12 @@ class KeycloakProvider implements TazamaAuthProvider<[string, string]> {
       throw new Error(`Token is missing required properties: sub: ${decodedToken.sub}, iss: ${decodedToken.iss}, exp: ${decodedToken.exp}`);
     }
 
+    decodedToken.sid ??= 'auth-lib-provider-keycloak';
+
     return {
       clientId: decodedToken.sub,
       iss: decodedToken.iss,
-      sid: decodedToken.sid,
+      sid: decodedToken.sid as string,
       exp: decodedToken.exp,
       tokenString: authToken.accessToken,
       claims: this.mapTazamaRoles(decodedToken),
@@ -89,8 +91,10 @@ class KeycloakProvider implements TazamaAuthProvider<[string, string]> {
     const roles: string[] = [];
 
     for (const res in decodedToken.resource_access) {
-      for (const role of decodedToken.resource_access[res].roles) {
-        roles.push(role);
+      if (Object.hasOwn(decodedToken.resource_access, res)) {
+        for (const role of decodedToken.resource_access[res].roles) {
+          roles.push(role);
+        }
       }
     }
 
