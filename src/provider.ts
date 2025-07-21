@@ -18,55 +18,7 @@ class KeycloakProvider {
     this.realm = iKeycloakConfig1.keycloakConfig.keycloakRealm;
     this.baseUrl = iKeycloakConfig1.keycloakConfig.authURL;
   }
-  /**
-   * Get user's own groups using their access token
-   */
-  // async getUserGroups(userAccessToken) {
-  //     console.log(userAccessToken);
-  //     console.log(this.baseUrl);
-  //     try {
-  //         // Use the account API which allows users to access their own information
-  //         const response = await fetch(`${this.baseUrl}/realms/${this.realm}/account/groups`, {
-  //             method: 'GET',
-  //             headers: {
-  //                 'Authorization': `Bearer ${userAccessToken}`,
-  //                 'Content-Type': 'application/json'
-  //             }
-  //         });
-  //         if (!response.ok) {
-  //             console.log(`Failed to get user groups: ${response.status} ${response.statusText}`);
-  //             return [];
-  //         }
-  //         const groups = await response.json();
-  //         console.log('groups:', groups);
-  //         return groups || [];
-  //     } catch (error) {
-  //         console.error('Failed to get user groups:', error);
-  //         return [];
-  //     }
-  // }
-  /**
-   * Get tenant information from user's groups (using their own token)
-   */
-  // async getTenantInfoFromUserGroups(groups) {
-  //     try {
-  //         if (!groups || groups.length === 0) {
-  //             return { tenant_id: 'default', group_name: null };
-  //         }
-  //         // Use the first group for tenant information
-  //         const primaryGroup = groups[0];
-  //         // Extract tenant_id from group attributes FIRST, then fallback to default
-  //         const tenantId = primaryGroup.attributes?.['tenant_id']?.[0] || 'default';
-  //         return {
-  //             tenant_id: tenantId,
-  //             group_name: primaryGroup.name,
-  //             group_path: primaryGroup.path
-  //         };
-  //     } catch (error) {
-  //         console.error('Failed to extract tenant info from groups:', error);
-  //         return { tenant_id: 'default', group_name: null };
-  //     }
-  // }
+
   /**
    * Authenticates with the provided username and password via KeyCloak to get a KeyCloak token
    * Generates a TazamaToken from the KeyCloak Token with added claims and tenant information
