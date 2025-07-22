@@ -1,8 +1,9 @@
 import { type KeycloakAuthToken, type KeycloakJwtToken } from './interfaces/iKeycloakToken';
-import { JwtService, type TazamaToken } from '@tazama-lf/auth-lib';
+import { JwtService, type TazamaAuthProvider, type TazamaToken } from '@tazama-lf/auth-lib';
 import jwt from 'jsonwebtoken';
 import { keycloakConfig } from './interfaces/iKeycloakConfig';
-class KeycloakProvider {
+
+class KeycloakProvider implements TazamaAuthProvider<[string, string]> {
   private readonly realm: string;
   private readonly baseUrl: string;
 
@@ -16,7 +17,11 @@ class KeycloakProvider {
 
   /**
    * Authenticates with the provided username and password via KeyCloak to get a KeyCloak token
-   * Generates a TazamaToken from the KeyCloak Token with added claims and tenant information
+   * Generates a TazamaToken from the KeyCloak Token with added claims
+   *
+   * @param {string} username - The username for authentication.
+   * @param {string} password - The password for authentication.
+   * @returns {Promise<string>} - A promise that resolves to a signed JWT token.
    */
   async getToken(username: string, password: string): Promise<string> {
     const form = new URLSearchParams();
@@ -34,7 +39,7 @@ class KeycloakProvider {
       redirect: 'follow',
     });
     const resBody = JSON.parse(await res.text());
-    const token = {
+    const token: KeycloakAuthToken = {
       accessToken: resBody.access_token,
       tokenType: resBody.token_type,
       refreshToken: resBody.refresh_token,
@@ -42,7 +47,10 @@ class KeycloakProvider {
     return JwtService.signToken(await this.generateTazamaToken(token));
   }
   /**
-   * Decodes the given Keycloak authentication token and maps out the associated claims with tenant info.
+   * Decodes the given Keycloak authentication token and maps out the associated claims.
+   *
+   * @param {KeycloakAuthToken} authToken - The Keycloak authentication token to decode.
+   * @returns {Promise<TazamaToken>} - A promise that resolves to a TazamaToken object containing the mapped claims.
    */
   async generateTazamaToken(authToken: KeycloakAuthToken): Promise<TazamaToken> {
     const decodedToken = jwt.decode(authToken.accessToken);
@@ -70,12 +78,15 @@ class KeycloakProvider {
       exp: decodedTokenTyped.exp,
       tokenString: authToken.accessToken,
       claims: this.mapTazamaRoles(decodedTokenTyped), // Pass the typed token here
-      tenantId: decodedTokenTyped.tenant_id ?? '',
+      tenantId: decodedTokenTyped.tenant_id ?? 'default',
     };
   }
 
   /**
    * Extracts and maps the claims from the decoded Keycloak JWT token.
+   *
+   * @param {KeycloakJwtToken} decodedToken - The decoded JWT token from Keycloak.
+   * @returns {string[]} - An array of privileges extracted from the decoded token.
    */
   mapTazamaRoles(decodedToken: KeycloakJwtToken): string[] {
     const roles: string[] = [];
