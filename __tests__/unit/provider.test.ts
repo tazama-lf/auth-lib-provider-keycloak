@@ -87,6 +87,70 @@ describe('Keycloak Provider', () => {
 
     jest.spyOn(jwt, 'decode').mockRestore();
   });
+
+  it('should handle token with missing optional fields (sid, tenant_id)', async () => {
+    jest.spyOn(jwt, 'decode').mockImplementationOnce(() => {
+      return {
+        sub: '687488800-fc3a-4425-977c-ed58f1afb7cd', // Required field
+        iss: 'http://localhost:8080/realms/tazama', // Required field
+        exp: 1753094140, // Required field
+        // sid and tenant_id are missing to test fallback values
+        resource_access: {
+          account: { roles: ['manage-account'] },
+        },
+        realm_access: {
+          roles: ['default-roles-tazama'],
+        },
+      } as JwtPayload;
+    });
+
+    const provider = new KeycloakProvider();
+    const token = await provider.getToken('testUser', 'testPassword');
+
+    expect(token).toEqual(jwtSignVal);
+    jest.spyOn(jwt, 'decode').mockRestore();
+  });
+
+  it('should handle token without realm_access', async () => {
+    jest.spyOn(jwt, 'decode').mockImplementationOnce(() => {
+      return {
+        sub: '687488800-fc3a-4425-977c-ed58f1afb7cd',
+        iss: 'http://localhost:8080/realms/tazama',
+        sid: 'f322ad3f-a050-4050-b936-2ed0e784742d',
+        exp: 1753094140,
+        tenant_id: 'tenant_value_005',
+        resource_access: {
+          account: { roles: ['manage-account', 'view-profile'] },
+        },
+        // realm_access is missing to test the conditional branch
+      } as JwtPayload;
+    });
+
+    const provider = new KeycloakProvider();
+    const token = await provider.getToken('testUser', 'testPassword');
+
+    expect(token).toEqual(jwtSignVal);
+    jest.spyOn(jwt, 'decode').mockRestore();
+  });
+
+  it('should handle token without resource_access and realm_access', async () => {
+    jest.spyOn(jwt, 'decode').mockImplementationOnce(() => {
+      return {
+        sub: '687488800-fc3a-4425-977c-ed58f1afb7cd',
+        iss: 'http://localhost:8080/realms/tazama',
+        sid: 'f322ad3f-a050-4050-b936-2ed0e784742d',
+        exp: 1753094140,
+        tenant_id: 'tenant_value_005',
+        // Both resource_access and realm_access are missing
+      } as JwtPayload;
+    });
+
+    const provider = new KeycloakProvider();
+    const token = await provider.getToken('testUser', 'testPassword');
+
+    expect(token).toEqual(jwtSignVal);
+    jest.spyOn(jwt, 'decode').mockRestore();
+  });
 });
 
 describe('Tazama Auth-lib', () => {

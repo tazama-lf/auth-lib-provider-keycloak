@@ -1,22 +1,17 @@
-'use strict';
-
 import { type KeycloakAuthToken, type KeycloakJwtToken } from './interfaces/iKeycloakToken';
-
-Object.defineProperty(exports, '__esModule', { value: true });
-exports.KeycloakProvider = undefined;
-const tslib1 = require('tslib');
-const authLib1 = require('@tazama-lf/auth-lib');
-const jsonwebtoken1 = tslib1.__importDefault(require('jsonwebtoken'));
-const iKeycloakConfig1 = require('./interfaces/iKeycloakConfig');
+import { JwtService, type TazamaToken } from '@tazama-lf/auth-lib';
+import jwt from 'jsonwebtoken';
+import { keycloakConfig } from './interfaces/iKeycloakConfig';
 class KeycloakProvider {
-  realm;
-  baseUrl;
+  private readonly realm: string;
+  private readonly baseUrl: string;
+
   constructor() {
-    if (!iKeycloakConfig1.keycloakConfig.keycloakRealm || !iKeycloakConfig1.keycloakConfig.authURL) {
+    if (!keycloakConfig.keycloakRealm || !keycloakConfig.authURL) {
       throw new Error('Missing realm or URL for Keycloak Provider');
     }
-    this.realm = iKeycloakConfig1.keycloakConfig.keycloakRealm;
-    this.baseUrl = iKeycloakConfig1.keycloakConfig.authURL;
+    this.realm = keycloakConfig.keycloakRealm;
+    this.baseUrl = keycloakConfig.authURL;
   }
 
   /**
@@ -25,8 +20,8 @@ class KeycloakProvider {
    */
   async getToken(username: string, password: string): Promise<string> {
     const form = new URLSearchParams();
-    form.append('client_id', iKeycloakConfig1.keycloakConfig.clientID as string);
-    form.append('client_secret', iKeycloakConfig1.keycloakConfig.clientSecret as string);
+    form.append('client_id', keycloakConfig.clientID);
+    form.append('client_secret', keycloakConfig.clientSecret);
     form.append('username', username);
     form.append('password', password);
     form.append('grant_type', 'password');
@@ -44,13 +39,13 @@ class KeycloakProvider {
       tokenType: resBody.token_type,
       refreshToken: resBody.refresh_token,
     };
-    return authLib1.JwtService.signToken(await this.generateTazamaToken(token));
+    return JwtService.signToken(await this.generateTazamaToken(token));
   }
   /**
    * Decodes the given Keycloak authentication token and maps out the associated claims with tenant info.
    */
-  async generateTazamaToken(authToken: KeycloakAuthToken): Promise<string> {
-    const decodedToken = jsonwebtoken1.default.decode(authToken.accessToken);
+  async generateTazamaToken(authToken: KeycloakAuthToken): Promise<TazamaToken> {
+    const decodedToken = jwt.decode(authToken.accessToken);
 
     // Ensure decodedToken is not a string or undefined and is of type KeycloakJwtToken
     if (!decodedToken || typeof decodedToken === 'string') {
@@ -68,22 +63,22 @@ class KeycloakProvider {
     }
 
     // Now you can safely use the typed decodedToken
-    return JSON.stringify({
+    return {
       clientId: decodedTokenTyped.sub,
       iss: decodedTokenTyped.iss,
-      sid: decodedTokenTyped.sid,
+      sid: decodedTokenTyped.sid || '',
       exp: decodedTokenTyped.exp,
       tokenString: authToken.accessToken,
       claims: this.mapTazamaRoles(decodedTokenTyped), // Pass the typed token here
-      tenantId: decodedTokenTyped.tenant_id,
-    });
+      tenantId: decodedTokenTyped.tenant_id ?? '',
+    };
   }
 
   /**
    * Extracts and maps the claims from the decoded Keycloak JWT token.
    */
   mapTazamaRoles(decodedToken: KeycloakJwtToken): string[] {
-    const roles = [];
+    const roles: string[] = [];
     for (const res in decodedToken.resource_access) {
       for (const role of decodedToken.resource_access[res].roles) {
         roles.push(role);
@@ -97,6 +92,4 @@ class KeycloakProvider {
     return roles;
   }
 }
-// export { KeycloakProvider };
 export { KeycloakProvider };
-//# sourceMappingURL=provider.js.map

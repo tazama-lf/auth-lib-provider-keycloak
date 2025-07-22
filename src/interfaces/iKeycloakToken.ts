@@ -5,6 +5,7 @@ interface KeycloakJwtToken extends JwtPayload {
   realm_access?: {
     roles: string[];
   };
+  tenant_id?: string;
 }
 
 interface KeycloakAuthToken {
