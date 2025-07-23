@@ -38,13 +38,16 @@ class KeycloakProvider implements TazamaAuthProvider<[string, string]> {
       headers: myHeaders,
       redirect: 'follow',
     });
-    const resBody = JSON.parse(await res.text());
+    
+    const resBody = JSON.parse(await res.text()) as { access_token: string; token_type: string; refresh_token: string };
+
     const token: KeycloakAuthToken = {
       accessToken: resBody.access_token,
       tokenType: resBody.token_type,
       refreshToken: resBody.refresh_token,
     };
-    return JwtService.signToken(await this.generateTazamaToken(token));
+
+    return JwtService.signToken(this.generateTazamaToken(token));
   }
   /**
    * Decodes the given Keycloak authentication token and maps out the associated claims.
@@ -52,33 +55,31 @@ class KeycloakProvider implements TazamaAuthProvider<[string, string]> {
    * @param {KeycloakAuthToken} authToken - The Keycloak authentication token to decode.
    * @returns {Promise<TazamaToken>} - A promise that resolves to a TazamaToken object containing the mapped claims.
    */
-  async generateTazamaToken(authToken: KeycloakAuthToken): Promise<TazamaToken> {
-    const decodedToken = jwt.decode(authToken.accessToken);
+  generateTazamaToken(authToken: KeycloakAuthToken): TazamaToken {
+    const decodedToken: KeycloakJwtToken = jwt.decode(authToken.accessToken);
 
     // Ensure decodedToken is not a string or undefined and is of type KeycloakJwtToken
     if (!decodedToken || typeof decodedToken === 'string') {
       throw new Error(`Token is in the wrong format, received ${typeof decodedToken}`);
     }
 
-    // Type assertion: safely cast decodedToken to KeycloakJwtToken
-    const decodedTokenTyped = decodedToken as KeycloakJwtToken;
-
     // Ensure required fields are present in the decoded token
-    if (!decodedTokenTyped.sub || !decodedTokenTyped.iss || !decodedTokenTyped.exp) {
+    if (!decodedToken.sub || !decodedToken.iss || !decodedToken.exp) {
       throw new Error(
-        `Token is missing required properties: sub: ${decodedTokenTyped.sub}, iss: ${decodedTokenTyped.iss}, exp: ${decodedTokenTyped.exp}`,
+        `Token is missing required properties: sub: ${decodedToken.sub}, iss: ${decodedToken.iss}, exp: ${decodedToken.exp}`,
       );
     }
 
-    // Now you can safely use the typed decodedToken
+    decodedToken.sid ??= 'auth-lib-provider-keycloak';
+
     return {
-      clientId: decodedTokenTyped.sub,
-      iss: decodedTokenTyped.iss,
-      sid: decodedTokenTyped.sid || '',
-      exp: decodedTokenTyped.exp,
+      clientId: decodedToken.sub,
+      iss: decodedToken.iss,
+      sid: decodedToken.sid as string,
+      exp: decodedToken.exp,
       tokenString: authToken.accessToken,
-      claims: this.mapTazamaRoles(decodedTokenTyped), // Pass the typed token here
-      tenantId: decodedTokenTyped.tenant_id ?? 'default',
+      claims: this.mapTazamaRoles(decodedToken), // Pass the typed token here
+      tenantId: decodedToken.tenant_id ?? 'DEFAULT',
     };
   }
 
@@ -91,8 +92,10 @@ class KeycloakProvider implements TazamaAuthProvider<[string, string]> {
   mapTazamaRoles(decodedToken: KeycloakJwtToken): string[] {
     const roles: string[] = [];
     for (const res in decodedToken.resource_access) {
-      for (const role of decodedToken.resource_access[res].roles) {
-        roles.push(role);
+      if (Object.hasOwn(decodedToken.resource_access, res)) {
+        for (const role of decodedToken.resource_access[res].roles) {
+          roles.push(role);
+        }
       }
     }
     if (decodedToken.realm_access) {
