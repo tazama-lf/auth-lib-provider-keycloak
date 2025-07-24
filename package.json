@@ -15,7 +15,8 @@
     "lint:eslint": "eslint \"**/*.ts\"",
     "lint:eslint-unused": "eslint --report-unused-disable-directives \"**/*.ts\"",
     "lint:eslint-no-inline": "eslint --no-inline-config \"**/*.ts\"",
-    "lint:prettier": "prettier --check \"**/*.ts\""
+    "lint:prettier": "prettier --check \"**/*.ts\"",
+    "prepare": "husky"
   },
   "files": [
     "lib"

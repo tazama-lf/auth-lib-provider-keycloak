@@ -8,7 +8,7 @@ jest.mock('fs');
 
 const mockKeycloakAuthToken = {
   access_token:
-    'eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJacDJINEtReVBFUW9oMWQwRTVSZzdnaThBeUQzeGVLNWpPSjdTX3BBYkpFIn0.eyJleHAiOjE3MjIyNTU4ODMsImlhdCI6MTcyMjI1NTU4MywianRpIjoiYzZiZDc5NjQtZDRlZS00OWQ5LWFlYzktZTA3NWU1N2E2OTAxIiwiaXNzIjoiaHR0cDovL2xvY2FsaG9zdDo4MDgwL3JlYWxtcy90YXphbWEiLCJhdWQiOiJhY2NvdW50Iiwic3ViIjoiM2U1ZjQ5MjYtYjVjMi00YjQ2LTk0OTItNjQwYzg1YTcwZDM5IiwidHlwIjoiQmVhcmVyIiwiYXpwIjoiYXV0aC1saWItY2xpZW50Iiwic2Vzc2lvbl9zdGF0ZSI6IjIxNTdiNjNhLTFjZWQtNDQ0Mi04YjNiLTMyZjg2OTFkYTdkNSIsImFjciI6IjEiLCJhbGxvd2VkLW9yaWdpbnMiOlsiLyoiXSwicmVhbG1fYWNjZXNzIjp7InJvbGVzIjpbIlBPU1RfVjFfRVZBTFVBVEVfSVNPMjAwMjJfUEFJTl8wMDFfMDAxXzExIiwiUE9TVF9WMV9FVkFMVUFURV9JU08yMDAyMl9QQUNTXzAwOF8wMDFfMTAiLCJQT1NUX1YxX0VWQUxVQVRFX0lTTzIwMDIyX1BBQ1NfMDAyXzAwMV8xMiIsImRlZmF1bHQtcm9sZXMtdGF6YW1hIiwib2ZmbGluZV9hY2Nlc3MiLCJQT1NUX1YxX0VWQUxVQVRFX0lTTzIwMDIyX1BBSU5fMDEzXzAwMV8wOSIsInVtYV9hdXRob3JpemF0aW9uIl19LCJyZXNvdXJjZV9hY2Nlc3MiOnsiYWNjb3VudCI6eyJyb2xlcyI6WyJtYW5hZ2UtYWNjb3VudCIsIm1hbmFnZS1hY2NvdW50LWxpbmtzIiwidmlldy1wcm9maWxlIl19fSwic2NvcGUiOiJlbWFpbCBwcm9maWxlIiwic2lkIjoiMjE1N2I2M2EtMWNlZC00NDQyLThiM2ItMzJmODY5MWRhN2Q1IiwiZW1haWxfdmVyaWZpZWQiOnRydWUsInByZWZlcnJlZF91c2VybmFtZSI6InRhemFtYS11c2VyIiwiZW1haWwiOiJ0YXphbWEtdXNlckBleGFtcGxlLmNvbSJ9.V5r6U2pS80OeSVNKbXZzHyli2GD3oITki5FaQbTV8DtGm9SF8tE2E-8KvZ5I0mtH5m9VCmFNuaR_8ODol_obGiRG1R-1J_hajxEI_BgBybFByxOX5HQPUnr4xTZrHqtzbBk1tv711SrYuqJHhrslxCG1dE3CI32JXF-HhDoXTGllrkpWKiRfe9hrbQg52-X06buBeCcRT6FU860tq-NciXB73RkyBpKhRGaImt53xZyLb_lpz-ZOkD63euOvAUEJNQQdHG-VauHov6VixUAmLmps5havozh3998sX6vhtSnBnRQXfonLJowh6I4R2ibhkAYrJeokf_MBHqUwmv8I2g',
+    'eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJKRXlHWmdQQ1pReXJlak91bEotVHFuRkZocEpFQUdMeE53T2tLQm5fcEQwIn0.eyJleHAiOjE3NTMwOTQxNDAsImlhdCI6MTc1MzA5Mzg0MCwianRpIjoiZjFiMzI5ZTMtMzhlMS00NDlhLWE3ZmYtYWU5MzZkNWFiMTYwIiwiaXNzIjoiaHR0cDovL2xvY2FsaG9zdDo4MDgwL3JlYWxtcy90YXphbWEiLCJhdWQiOiJhY2NvdW50Iiwic3ViIjoiNjg3NDg4MDAtZmMzYS00NDI1LTk3N2MtZWQ1OGYxYWZiN2NkIiwidHlwIjoiQmVhcmVyIiwiYXpwIjoiYXV0aC1saWItY2xpZW50Iiwic2Vzc2lvbl9zdGF0ZSI6ImYzMjJhZDNmLWEwNTAtNDA1MC1iOTM2LTJlZDBlNzg0NzRkMCIsImFjciI6IjEiLCJhbGxvd2VkLW9yaWdpbnMiOlsiLyoiXSwicmVhbG1fYWNjZXNzIjp7InJvbGVzIjpbImRlZmF1bHQtcm9sZXMtdGF6YW1hIiwib2ZmbGluZV9hY2Nlc3MiLCJQT1NUX1YxX0VWQUxVQVRFX0lTTzIwMDIyX1BBSU5fMDEzXzAwMV8wOSIsInVtYV9hdXRob3JpemF0aW9uIl19LCJyZXNvdXJjZV9hY2Nlc3MiOnsiYWNjb3VudCI6eyJyb2xlcyI6WyJtYW5hZ2UtYWNjb3VudCIsIm1hbmFnZS1hY2NvdW50LWxpbmtzIiwidmlldy1wcm9maWxlIl19fSwic2NvcGUiOiJwcm9maWxlIGVtYWlsIiwic2lkIjoiZjMyMmFkM2YtYTA1MC00MDUwLWI5MzYtMmVkMGU3ODQ3NGQwIiwidGVuYW50X2lkIjoidGVuYW50X3ZhbHVlXzAwNSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJncm91cHMiOlsicGF5c3lzIl0sInByZWZlcnJlZF91c2VybmFtZSI6ImFiZHVsbGFoIiwiZW1haWwiOiJhYmR1bGxhaEBnbWFpbC5jb20ifQ.Oy6xyc7OhZjJt2eVizVO3Z2MuYKD2VnZXvj-WgB1dcfosdmCzoRlL3_WYc5MLCrm_CZxbHq6MoPEmKQQ3JKfZiSUz2QMUchy0VJ7PppbatRoLn4Nhd92qtZ2GWrqq2CKhtYmWzaTuGG_m0GlLvxKVog0C2caTymRfs9K-p4fkWVS-f6m2czw_jMwkR0ydUmS19e6muIRX9_A-GeaAFnmi7Fj37MJ1DT9DHBYAXFodUBGA3Q9itvAyhEroMAOMOXSy2xVIwb5Nv-hRAZaOh4rSPhQBL8TWfy5FIgKk-U5HYtehawz5MXnXZuyfA8tc4V62MaZaf-ZIpbqDM4M42lhbA',
   refresh_token: 'TEST_REFRESH_TOKEN',
   token_type: 'Bearer',
   scope: 'TEST',
@@ -85,6 +85,70 @@ describe('Keycloak Provider', () => {
 
     expect(providerSpy).toHaveBeenCalledTimes(1);
 
+    jest.spyOn(jwt, 'decode').mockRestore();
+  });
+
+  it('should handle token with missing optional fields (sid, tenant_id)', async () => {
+    jest.spyOn(jwt, 'decode').mockImplementationOnce(() => {
+      return {
+        sub: '687488800-fc3a-4425-977c-ed58f1afb7cd', // Required field
+        iss: 'http://localhost:8080/realms/tazama', // Required field
+        exp: 1753094140, // Required field
+        // sid and tenant_id are missing to test fallback values
+        resource_access: {
+          account: { roles: ['manage-account'] },
+        },
+        realm_access: {
+          roles: ['default-roles-tazama'],
+        },
+      } as JwtPayload;
+    });
+
+    const provider = new KeycloakProvider();
+    const token = await provider.getToken('testUser', 'testPassword');
+
+    expect(token).toEqual(jwtSignVal);
+    jest.spyOn(jwt, 'decode').mockRestore();
+  });
+
+  it('should handle token without realm_access', async () => {
+    jest.spyOn(jwt, 'decode').mockImplementationOnce(() => {
+      return {
+        sub: '687488800-fc3a-4425-977c-ed58f1afb7cd',
+        iss: 'http://localhost:8080/realms/tazama',
+        sid: 'f322ad3f-a050-4050-b936-2ed0e784742d',
+        exp: 1753094140,
+        tenant_id: 'tenant_value_005',
+        resource_access: {
+          account: { roles: ['manage-account', 'view-profile'] },
+        },
+        // realm_access is missing to test the conditional branch
+      } as JwtPayload;
+    });
+
+    const provider = new KeycloakProvider();
+    const token = await provider.getToken('testUser', 'testPassword');
+
+    expect(token).toEqual(jwtSignVal);
+    jest.spyOn(jwt, 'decode').mockRestore();
+  });
+
+  it('should handle token without resource_access and realm_access', async () => {
+    jest.spyOn(jwt, 'decode').mockImplementationOnce(() => {
+      return {
+        sub: '687488800-fc3a-4425-977c-ed58f1afb7cd',
+        iss: 'http://localhost:8080/realms/tazama',
+        sid: 'f322ad3f-a050-4050-b936-2ed0e784742d',
+        exp: 1753094140,
+        tenant_id: 'tenant_value_005',
+        // Both resource_access and realm_access are missing
+      } as JwtPayload;
+    });
+
+    const provider = new KeycloakProvider();
+    const token = await provider.getToken('testUser', 'testPassword');
+
+    expect(token).toEqual(jwtSignVal);
     jest.spyOn(jwt, 'decode').mockRestore();
   });
 });
