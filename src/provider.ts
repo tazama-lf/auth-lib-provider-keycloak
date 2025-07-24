@@ -1,4 +1,4 @@
-import { type KeycloakAuthToken, type KeycloakJwtToken } from './interfaces/iKeycloakToken';
+import type { KeycloakAuthToken, KeycloakJwtToken } from './interfaces/iKeycloakToken';
 import { JwtService, type TazamaAuthProvider, type TazamaToken } from '@tazama-lf/auth-lib';
 import jwt from 'jsonwebtoken';
 import { keycloakConfig } from './interfaces/iKeycloakConfig';
@@ -38,7 +38,7 @@ class KeycloakProvider implements TazamaAuthProvider<[string, string]> {
       headers: myHeaders,
       redirect: 'follow',
     });
-    
+
     const resBody = JSON.parse(await res.text()) as { access_token: string; token_type: string; refresh_token: string };
 
     const token: KeycloakAuthToken = {
@@ -56,18 +56,17 @@ class KeycloakProvider implements TazamaAuthProvider<[string, string]> {
    * @returns {Promise<TazamaToken>} - A promise that resolves to a TazamaToken object containing the mapped claims.
    */
   generateTazamaToken(authToken: KeycloakAuthToken): TazamaToken {
-    const decodedToken: KeycloakJwtToken = jwt.decode(authToken.accessToken);
+    const decoded = jwt.decode(authToken.accessToken);
 
     // Ensure decodedToken is not a string or undefined and is of type KeycloakJwtToken
-    if (!decodedToken || typeof decodedToken === 'string') {
-      throw new Error(`Token is in the wrong format, received ${typeof decodedToken}`);
+    if (!decoded || typeof decoded === 'string') {
+      throw new Error(`Token is in the wrong format, received ${typeof decoded}`);
     }
+    const decodedToken: KeycloakJwtToken = decoded as KeycloakJwtToken;
 
     // Ensure required fields are present in the decoded token
     if (!decodedToken.sub || !decodedToken.iss || !decodedToken.exp) {
-      throw new Error(
-        `Token is missing required properties: sub: ${decodedToken.sub}, iss: ${decodedToken.iss}, exp: ${decodedToken.exp}`,
-      );
+      throw new Error(`Token is missing required properties: sub: ${decodedToken.sub}, iss: ${decodedToken.iss}, exp: ${decodedToken.exp}`);
     }
 
     decodedToken.sid ??= 'auth-lib-provider-keycloak';

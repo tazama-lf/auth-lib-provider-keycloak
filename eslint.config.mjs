@@ -9,7 +9,7 @@ import { defineConfig, globalIgnores } from 'eslint/config';
 
 export default defineConfig([
   eslintConfigPrettier,
-  globalIgnores(['**/coverage/**', '**/build/**', '**/node_modules/**', '**/__tests__/**', '*.ts']),
+  globalIgnores(['**/coverage/**', '**/build/**', '**/lib/**', '**/node_modules/**', '**/__tests__/**']),
   {
     files: ['**/*.ts'],
     plugins: {
