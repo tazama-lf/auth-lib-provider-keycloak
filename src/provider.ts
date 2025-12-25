@@ -16,6 +16,62 @@ class KeycloakProvider implements TazamaAuthProvider<[string, string]> {
   }
 
   /**
+   * Gets an admin access token for Keycloak Admin API calls
+   * @returns {Promise<string>} - Admin access token
+   */
+  async getAdminToken(): Promise<string> {
+    const form = new URLSearchParams();
+    form.append('client_id', keycloakConfig.clientID);
+    form.append('client_secret', keycloakConfig.clientSecret);
+    form.append('grant_type', 'client_credentials');
+    const res = await fetch(`${this.baseUrl}/realms/${this.realm}/protocol/openid-connect/token`, {
+      method: 'POST',
+      body: form,
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    const resBody = (await res.json()) as { access_token: string };
+    return resBody.access_token;
+  }
+
+  /**
+   * Checks brute force detection status for a user
+   * @param {string} userId - The user ID to check
+   * @returns {Promise<Object>} - Brute force detection info
+   */
+  async getBruteForceStatus(userId: string): Promise<{ disabled: boolean; lastFailure?: number }> {
+    const adminToken = await this.getAdminToken();
+    const res = await fetch(`${this.baseUrl}/admin/realms/${this.realm}/attack-detection/brute-force/users/${userId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${adminToken}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    if (!res.ok) {
+      throw new Error(`Failed to get brute force status: ${res.statusText}`);
+    }
+    return (await res.json()) as { disabled: boolean; lastFailure?: number };
+  }
+
+  /**
+   * Gets user by username to retrieve userId
+   * @param {string} username - The username to search for
+   * @returns {Promise<Object>} - User object
+   */
+  async getUserByUsername(username: string): Promise<{ id: string } | undefined> {
+    const adminToken = await this.getAdminToken();
+    const res = await fetch(`${this.baseUrl}/admin/realms/${this.realm}/users?username=${encodeURIComponent(username)}&exact=true`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${adminToken}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    const users = (await res.json()) as Array<{ id: string }>;
+    return users[0];
+  }
+
+  /**
    * Authenticates with the provided username and password via KeyCloak to get a KeyCloak token
    * Generates a TazamaToken from the KeyCloak Token with added claims
    *
@@ -39,7 +95,39 @@ class KeycloakProvider implements TazamaAuthProvider<[string, string]> {
       redirect: 'follow',
     });
 
-    const resBody = JSON.parse(await res.text()) as { access_token: string; token_type: string; refresh_token: string };
+    const resBody = JSON.parse(await res.text()) as {
+      access_token: string;
+      token_type: string;
+      refresh_token: string;
+      error?: string;
+      error_description?: string;
+    };
+
+    if (!res.ok) {
+      try {
+        const user = await this.getUserByUsername(username);
+        if (user?.id) {
+          const bruteForceStatus = await this.getBruteForceStatus(user.id);
+
+          if (bruteForceStatus.disabled) {
+            throw new Error('Account temporarily locked due to too many failed login attempts.');
+          }
+        }
+      } catch (adminError) {
+        if (
+          adminError instanceof Error &&
+          (adminError.message.includes('Invalid Credentials') || adminError.message.includes('Account temporarily locked'))
+        ) {
+          throw adminError;
+        }
+      }
+
+      if (resBody.error === 'invalid_grant') {
+        throw new Error('Invalid Credentials');
+      }
+
+      throw new Error(resBody.error_description ?? 'Authentication failed');
+    }
 
     const token: KeycloakAuthToken = {
       accessToken: resBody.access_token,

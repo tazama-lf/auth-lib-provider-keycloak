@@ -151,6 +151,179 @@ describe('Keycloak Provider', () => {
     expect(token).toEqual(jwtSignVal);
     jest.spyOn(jwt, 'decode').mockRestore();
   });
+
+  it('should get admin token successfully', async () => {
+    const mockAdminTokenResponse = {
+      access_token: 'admin-token-123',
+      token_type: 'Bearer',
+    };
+
+    jest.spyOn(global, 'fetch').mockImplementationOnce(() => Promise.resolve(new Response(JSON.stringify(mockAdminTokenResponse))));
+
+    const provider = new KeycloakProvider();
+    const adminToken = await provider.getAdminToken();
+
+    expect(adminToken).toEqual('admin-token-123');
+  });
+
+  it('should get user by username successfully', async () => {
+    const mockAdminTokenResponse = { access_token: 'admin-token' };
+    const mockUserResponse = [{ id: 'user-id-123', username: 'testUser' }];
+
+    jest
+      .spyOn(global, 'fetch')
+      .mockImplementationOnce(() => Promise.resolve(new Response(JSON.stringify(mockAdminTokenResponse))))
+      .mockImplementationOnce(() => Promise.resolve(new Response(JSON.stringify(mockUserResponse))));
+
+    const provider = new KeycloakProvider();
+    const user = await provider.getUserByUsername('testUser');
+
+    expect(user?.id).toEqual('user-id-123');
+  });
+
+  it('should get brute force status successfully', async () => {
+    const mockAdminTokenResponse = { access_token: 'admin-token' };
+    const mockBruteForceResponse = { disabled: false, numFailures: 0 };
+
+    jest
+      .spyOn(global, 'fetch')
+      .mockImplementationOnce(() => Promise.resolve(new Response(JSON.stringify(mockAdminTokenResponse))))
+      .mockImplementationOnce(() => Promise.resolve(new Response(JSON.stringify(mockBruteForceResponse))));
+
+    const provider = new KeycloakProvider();
+    const status = await provider.getBruteForceStatus('user-id-123');
+
+    expect(status.disabled).toBe(false);
+  });
+
+  it('should throw error when brute force status request fails', async () => {
+    const mockAdminTokenResponse = { access_token: 'admin-token' };
+
+    jest
+      .spyOn(global, 'fetch')
+      .mockImplementationOnce(() => Promise.resolve(new Response(JSON.stringify(mockAdminTokenResponse))))
+      .mockImplementationOnce(() => Promise.resolve(new Response('Not Found', { status: 404, statusText: 'Not Found' })));
+
+    const provider = new KeycloakProvider();
+
+    await expect(provider.getBruteForceStatus('invalid-user')).rejects.toThrow('Failed to get brute force status: Not Found');
+  });
+
+  it('should handle authentication failure with invalid credentials', async () => {
+    const mockErrorResponse = {
+      error: 'invalid_grant',
+      error_description: 'Invalid user credentials',
+    };
+
+    jest.spyOn(global, 'fetch').mockImplementationOnce(() =>
+      Promise.resolve(
+        new Response(JSON.stringify(mockErrorResponse), {
+          status: 401,
+          statusText: 'Unauthorized',
+        }),
+      ),
+    );
+
+    const provider = new KeycloakProvider();
+
+    await expect(provider.getToken('wrongUser', 'wrongPassword')).rejects.toThrow('Invalid Credentials');
+  });
+
+  it('should handle authentication failure with account locked', async () => {
+    const mockErrorResponse = {
+      error: 'invalid_grant',
+      error_description: 'Account disabled',
+    };
+    const mockAdminTokenResponse = { access_token: 'admin-token' };
+    const mockUserResponse = [{ id: 'user-id-123' }];
+    const mockBruteForceResponse = { disabled: true, lastFailure: Date.now() };
+
+    jest
+      .spyOn(global, 'fetch')
+      .mockImplementationOnce(() =>
+        Promise.resolve(
+          new Response(JSON.stringify(mockErrorResponse), {
+            status: 401,
+            statusText: 'Unauthorized',
+          }),
+        ),
+      )
+      .mockImplementationOnce(() => Promise.resolve(new Response(JSON.stringify(mockAdminTokenResponse))))
+      .mockImplementationOnce(() => Promise.resolve(new Response(JSON.stringify(mockUserResponse))))
+      .mockImplementationOnce(() => Promise.resolve(new Response(JSON.stringify(mockAdminTokenResponse))))
+      .mockImplementationOnce(() => Promise.resolve(new Response(JSON.stringify(mockBruteForceResponse))));
+
+    const provider = new KeycloakProvider();
+
+    await expect(provider.getToken('lockedUser', 'password')).rejects.toThrow(
+      'Account temporarily locked due to too many failed login attempts.',
+    );
+  });
+
+  it('should handle authentication failure with generic error', async () => {
+    const mockErrorResponse = {
+      error: 'server_error',
+      error_description: 'Internal server error',
+    };
+
+    jest.spyOn(global, 'fetch').mockImplementationOnce(() =>
+      Promise.resolve(
+        new Response(JSON.stringify(mockErrorResponse), {
+          status: 500,
+          statusText: 'Internal Server Error',
+        }),
+      ),
+    );
+
+    const provider = new KeycloakProvider();
+
+    await expect(provider.getToken('testUser', 'testPassword')).rejects.toThrow('Internal server error');
+  });
+
+  it('should handle authentication failure when user not found during brute force check', async () => {
+    const mockErrorResponse = {
+      error: 'invalid_grant',
+      error_description: 'Invalid credentials',
+    };
+    const mockAdminTokenResponse = { access_token: 'admin-token' };
+    const mockUserResponse: never[] = [];
+
+    jest
+      .spyOn(global, 'fetch')
+      .mockImplementationOnce(() =>
+        Promise.resolve(
+          new Response(JSON.stringify(mockErrorResponse), {
+            status: 401,
+            statusText: 'Unauthorized',
+          }),
+        ),
+      )
+      .mockImplementationOnce(() => Promise.resolve(new Response(JSON.stringify(mockAdminTokenResponse))))
+      .mockImplementationOnce(() => Promise.resolve(new Response(JSON.stringify(mockUserResponse))));
+
+    const provider = new KeycloakProvider();
+
+    await expect(provider.getToken('nonExistentUser', 'password')).rejects.toThrow('Invalid Credentials');
+  });
+
+  it('should handle authentication failure without error description', async () => {
+    const mockErrorResponse = {
+      error: 'unknown_error',
+    };
+
+    jest.spyOn(global, 'fetch').mockImplementationOnce(() =>
+      Promise.resolve(
+        new Response(JSON.stringify(mockErrorResponse), {
+          status: 500,
+          statusText: 'Internal Server Error',
+        }),
+      ),
+    );
+
+    const provider = new KeycloakProvider();
+
+    await expect(provider.getToken('testUser', 'testPassword')).rejects.toThrow('Authentication failed');
+  });
 });
 
 describe('Tazama Auth-lib', () => {
