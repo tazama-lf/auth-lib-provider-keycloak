@@ -6,3 +6,12 @@ function register(): TazamaAuthProvider<[string, string]> {
 }
 
 export { register };
+export type {
+  KeycloakGroup,
+  KeycloakSubGroup,
+  KeycloakGroupMember,
+  KeycloakGroupAccess,
+  GroupAttribute,
+} from './interfaces/iKeycloakGroup';
+export type { iKeycloakConfig } from './interfaces/iKeycloakConfig';
+export type { KeycloakJwtToken, KeycloakAuthToken } from './interfaces/iKeycloakToken';
