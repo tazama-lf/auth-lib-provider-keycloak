@@ -16,7 +16,7 @@ export interface KeycloakGroup {
   description: string;
   path: string;
   subGroupCount: number;
-  subGroups: KeycloakGroup[];
+  subGroups: KeycloakSubGroup[];
   access: KeycloakGroupAccess;
   attributes: GroupAttribute;
 }
