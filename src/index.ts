@@ -1,11 +1,13 @@
 import type { TazamaAuthProvider } from '@tazama-lf/auth-lib';
 import { KeycloakProvider } from './provider';
 
+const keycloakProvider = new KeycloakProvider();
+
 function register(): TazamaAuthProvider<[string, string]> {
   return KeycloakProvider.prototype;
 }
 
-export { register };
+export { register, keycloakProvider };
 export type {
   KeycloakGroup,
   KeycloakSubGroup,

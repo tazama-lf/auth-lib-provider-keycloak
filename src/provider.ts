@@ -2,6 +2,10 @@ import type { KeycloakAuthToken, KeycloakJwtToken } from './interfaces/iKeycloak
 import { JwtService, type TazamaAuthProvider, type TazamaToken } from '@tazama-lf/auth-lib';
 import jwt from 'jsonwebtoken';
 import { keycloakConfig } from './interfaces/iKeycloakConfig';
+import type { KeycloakGroup, KeycloakSubGroup, KeycloakGroupMember } from './interfaces/iKeycloakGroup';
+
+const ADMIN_API_TIMEOUT_MS = 5000;
+const ZERO = 0;
 
 class KeycloakProvider implements TazamaAuthProvider<[string, string]> {
   private readonly realm: string;
@@ -103,6 +107,172 @@ class KeycloakProvider implements TazamaAuthProvider<[string, string]> {
       }
     }
     return roles;
+  }
+
+  /**
+   * Fetches user group details from Keycloak admin API based on group name search
+   *
+   * @param {string} tokenString - The access token string for authorization
+   * @param {string} userGroup - The group name to search for
+   * @returns {Promise<KeycloakGroup[]>} - A promise that resolves to an array of matching groups
+   */
+  async fetchUserGroupDetails(tokenString: string, userGroup: string): Promise<KeycloakGroup[]> {
+    try {
+      const encodedUserGroup = encodeURIComponent(userGroup);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        controller.abort();
+      }, ADMIN_API_TIMEOUT_MS);
+
+      const response = await fetch(
+        `${this.baseUrl}/admin/realms/${this.realm}/groups?search=${encodedUserGroup}&briefRepresentation=false`,
+        {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${tokenString}`,
+          },
+          signal: controller.signal,
+        },
+      );
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`Keycloak API error: ${response.status} ${response.statusText}`);
+      }
+
+      const groupDetails = (await response.json()) as KeycloakGroup[];
+      return groupDetails;
+    } catch (error) {
+      const err = error as Error;
+      throw new Error(`Failed to fetch user group details: ${err.message}`);
+    }
+  }
+
+  /**
+   * Fetches sub-groups (children) of a specific group from Keycloak admin API
+   *
+   * @param {string} tokenString - The access token string for authorization
+   * @param {string} groupId - The parent group ID
+   * @returns {Promise<KeycloakSubGroup[]>} - A promise that resolves to an array of sub-groups
+   */
+  async fetchSubGroups(tokenString: string, groupId: string): Promise<KeycloakSubGroup[]> {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        controller.abort();
+      }, ADMIN_API_TIMEOUT_MS);
+
+      const response = await fetch(`${this.baseUrl}/admin/realms/${this.realm}/groups/${groupId}/children`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${tokenString}`,
+        },
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`Keycloak API error: ${response.status} ${response.statusText}`);
+      }
+
+      const subGroupDetails = (await response.json()) as KeycloakSubGroup[];
+      return subGroupDetails;
+    } catch (error) {
+      const err = error as Error;
+      throw new Error(`Failed to fetch sub-groups: ${err.message}`);
+    }
+  }
+
+  /**
+   * Fetches members of a specific group from Keycloak admin API
+   *
+   * @param {string} tokenString - The access token string for authorization
+   * @param {string} groupId - The group ID to fetch members from
+   * @returns {Promise<KeycloakGroupMember[]>} - A promise that resolves to an array of group members
+   */
+  async fetchGroupMembers(tokenString: string, groupId: string): Promise<KeycloakGroupMember[]> {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        controller.abort();
+      }, ADMIN_API_TIMEOUT_MS);
+
+      const response = await fetch(`${this.baseUrl}/admin/realms/${this.realm}/groups/${groupId}/members`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${tokenString}`,
+        },
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`Keycloak API error: ${response.status} ${response.statusText}`);
+      }
+
+      const members = (await response.json()) as KeycloakGroupMember[];
+      return members;
+    } catch (error) {
+      const err = error as Error;
+      throw new Error(`Failed to fetch group members: ${err.message}`);
+    }
+  }
+
+  /**
+   * Fetches users by role from Keycloak groups with tenant filtering
+   *
+   * @param {TazamaToken} decodedToken - The decoded Tazama token containing tenant information
+   * @param {string} groupName - The name of the group to search for
+   * @param {string} [subGroupRoleName] - Optional sub-group/role name to filter by
+   * @returns {Promise<KeycloakGroupMember[]>} - A promise that resolves to an array of group members
+   */
+  async fetchUsersByRole(decodedToken: TazamaToken, groupName: string, subGroupRoleName?: string): Promise<KeycloakGroupMember[]> {
+    try {
+      // Fetch group details
+      const groupDetails = await this.fetchUserGroupDetails(decodedToken.tokenString, groupName);
+
+      if (groupDetails.length === ZERO) {
+        throw new Error(`No group found with the group name: ${groupName}`);
+      }
+
+      // Find tenant-specific group
+      const tenantGroup = groupDetails.find((group) => {
+        try {
+          const attrs = (group as unknown as Record<string, unknown>).attributes as Record<string, unknown>;
+          return (attrs.TENANT_ID as string[]).includes(decodedToken.tenantId);
+        } catch {
+          return false;
+        }
+      });
+
+      if (!tenantGroup) {
+        throw new Error(`No group found for the tenant ${decodedToken.tenantId}`);
+      }
+
+      let groupId = tenantGroup.id;
+
+      // If sub-group role is specified, find the sub-group
+      if (subGroupRoleName) {
+        if (tenantGroup.subGroupCount === ZERO) {
+          throw new Error(`No sub-groups found for the tenant group: ${tenantGroup.id}`);
+        } else {
+          const subGroups = await this.fetchSubGroups(decodedToken.tokenString, tenantGroup.id ?? '');
+          const filteredSubGroup = subGroups.find((group) => group.name === subGroupRoleName);
+
+          if (!filteredSubGroup) {
+            throw new Error(`No sub-group found with the role name: ${subGroupRoleName}`);
+          }
+          groupId = filteredSubGroup.id;
+        }
+      }
+
+      // Fetch and return group members
+      const groupMembers = await this.fetchGroupMembers(decodedToken.tokenString, groupId ?? '');
+      return groupMembers;
+    } catch (error) {
+      const err = error as Error;
+      throw new Error(`Failed to fetch users by role: ${err.message}`);
+    }
   }
 }
 export { KeycloakProvider };
