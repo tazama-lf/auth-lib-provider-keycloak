@@ -176,3 +176,338 @@ describe('Tazama Auth-lib', () => {
     expect(checkedClaims['admin-panel']).toBeFalsy();
   });
 });
+
+describe('Keycloak Provider - Admin API Methods', () => {
+  const mockGroups = [
+    {
+      id: 'group-1',
+      name: 'test-group',
+      path: '/test-group',
+      subGroupCount: 2,
+      attributes: {
+        TENANT_ID: ['tenant_value_005'],
+      },
+    },
+  ];
+
+  const mockSubGroups = [
+    {
+      id: 'subgroup-1',
+      name: 'admin-role',
+      path: '/test-group/admin-role',
+    },
+    {
+      id: 'subgroup-2',
+      name: 'user-role',
+      path: '/test-group/user-role',
+    },
+  ];
+
+  const mockMembers = [
+    {
+      id: 'user-1',
+      username: 'john.doe',
+      email: 'john@example.com',
+      firstName: 'John',
+      lastName: 'Doe',
+      emailVerified: true,
+      enabled: true,
+      createdTimestamp: 1234567890,
+      totp: false,
+      disableableCredentialTypes: [],
+      requiredActions: [],
+      notBefore: 0,
+    },
+  ];
+
+  const mockTazamaToken = {
+    clientId: '687488800-fc3a-4425-977c-ed58f1afb7cd',
+    iss: 'http://localhost:8080/realms/tazama',
+    sid: 'f322ad3f-a050-4050-b936-2ed0e784742d',
+    exp: 1753094140,
+    tokenString: 'test-token-string',
+    tenantId: 'tenant_value_005',
+    claims: ['default-roles-tazama'],
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    keycloakConfig.authURL = 'http://localhost:8080';
+    keycloakConfig.keycloakRealm = 'tazama';
+  });
+
+  it('should fetch user group details successfully', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify(mockGroups), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+
+    const provider = new KeycloakProvider();
+    const result = await provider.fetchUserGroupDetails('test-token', 'test-group');
+
+    expect(result).toEqual(mockGroups);
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/admin/realms/tazama/groups?search=test-group'),
+      expect.objectContaining({
+        method: 'GET',
+        headers: { Authorization: 'Bearer test-token' },
+      }),
+    );
+  });
+
+  it('should handle error when fetching group details fails', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValueOnce(
+      new Response('Not Found', {
+        status: 404,
+        statusText: 'Not Found',
+      }),
+    );
+
+    const provider = new KeycloakProvider();
+    await expect(provider.fetchUserGroupDetails('test-token', 'test-group')).rejects.toThrow('Failed to fetch user group details');
+  });
+
+  it('should fetch sub-groups successfully', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify(mockSubGroups), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+
+    const provider = new KeycloakProvider();
+    const result = await provider.fetchSubGroups('test-token', 'group-1');
+
+    expect(result).toEqual(mockSubGroups);
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/admin/realms/tazama/groups/group-1/children'),
+      expect.objectContaining({
+        method: 'GET',
+        headers: { Authorization: 'Bearer test-token' },
+      }),
+    );
+  });
+
+  it('should handle error when fetching sub-groups fails', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValueOnce(
+      new Response('Forbidden', {
+        status: 403,
+        statusText: 'Forbidden',
+      }),
+    );
+
+    const provider = new KeycloakProvider();
+    await expect(provider.fetchSubGroups('test-token', 'group-1')).rejects.toThrow('Failed to fetch sub-groups');
+  });
+
+  it('should fetch group members successfully', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify(mockMembers), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+
+    const provider = new KeycloakProvider();
+    const result = await provider.fetchGroupMembers('test-token', 'group-1');
+
+    expect(result).toEqual(mockMembers);
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/admin/realms/tazama/groups/group-1/members'),
+      expect.objectContaining({
+        method: 'GET',
+        headers: { Authorization: 'Bearer test-token' },
+      }),
+    );
+  });
+
+  it('should handle error when fetching group members fails', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValueOnce(
+      new Response('Unauthorized', {
+        status: 401,
+        statusText: 'Unauthorized',
+      }),
+    );
+
+    const provider = new KeycloakProvider();
+    await expect(provider.fetchGroupMembers('test-token', 'group-1')).rejects.toThrow('Failed to fetch group members');
+  });
+
+  it('should fetch users by role successfully', async () => {
+    const provider = new KeycloakProvider();
+
+    // Mock the three fetch calls needed for fetchUsersByRole
+    jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(mockGroups), {
+          status: 200,
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(mockMembers), {
+          status: 200,
+        }),
+      );
+
+    const result = await provider.fetchUsersByRole(mockTazamaToken, 'test-group');
+
+    expect(result).toEqual(mockMembers);
+  });
+
+  it('should fetch users by role with sub-group filtering', async () => {
+    const provider = new KeycloakProvider();
+
+    // Mock all four fetch calls: groups -> subgroups -> members
+    jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(mockGroups), {
+          status: 200,
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(mockSubGroups), {
+          status: 200,
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(mockMembers), {
+          status: 200,
+        }),
+      );
+
+    const result = await provider.fetchUsersByRole(mockTazamaToken, 'test-group', 'admin-role');
+
+    expect(result).toEqual(mockMembers);
+  });
+
+  it('should throw error when no group found', async () => {
+    const provider = new KeycloakProvider();
+
+    jest.spyOn(global, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify([]), {
+        status: 200,
+      }),
+    );
+
+    await expect(provider.fetchUsersByRole(mockTazamaToken, 'non-existent-group')).rejects.toThrow(
+      'No group found with the group name: non-existent-group',
+    );
+  });
+
+  it('should throw error when no tenant group found', async () => {
+    const provider = new KeycloakProvider();
+    const groupsWithoutTenant = [
+      {
+        id: 'group-1',
+        name: 'test-group',
+        attributes: {
+          TENANT_ID: ['different-tenant'],
+        },
+      },
+    ];
+
+    jest.spyOn(global, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify(groupsWithoutTenant), {
+        status: 200,
+      }),
+    );
+
+    await expect(provider.fetchUsersByRole(mockTazamaToken, 'test-group')).rejects.toThrow(
+      'No group found for the tenant tenant_value_005',
+    );
+  });
+
+  it('should throw error when sub-group not found', async () => {
+    const provider = new KeycloakProvider();
+
+    jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(mockGroups), {
+          status: 200,
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(mockSubGroups), {
+          status: 200,
+        }),
+      );
+
+    await expect(provider.fetchUsersByRole(mockTazamaToken, 'test-group', 'non-existent-role')).rejects.toThrow(
+      'No sub-group found with the role name: non-existent-role',
+    );
+  });
+
+  it('should throw error when tenant group has no sub-groups but sub-group requested', async () => {
+    const provider = new KeycloakProvider();
+    const groupWithNoSubGroups = [
+      {
+        id: 'group-1',
+        name: 'test-group',
+        subGroupCount: 0,
+        attributes: {
+          TENANT_ID: ['tenant_value_005'],
+        },
+      },
+    ];
+
+    jest.spyOn(global, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify(groupWithNoSubGroups), {
+        status: 200,
+      }),
+    );
+
+    await expect(provider.fetchUsersByRole(mockTazamaToken, 'test-group', 'admin-role')).rejects.toThrow(
+      'No sub-groups found for the tenant group: group-1',
+    );
+  });
+
+  it('should handle groups with malformed attributes', async () => {
+    const provider = new KeycloakProvider();
+    const groupsWithBadAttributes = [
+      {
+        id: 'group-1',
+        name: 'test-group',
+        // attributes is null/undefined or malformed
+        attributes: null,
+      },
+      {
+        id: 'group-2',
+        name: 'test-group',
+        attributes: {
+          TENANT_ID: ['tenant_value_005'],
+        },
+      },
+    ];
+
+    jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(groupsWithBadAttributes), {
+          status: 200,
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(mockMembers), {
+          status: 200,
+        }),
+      );
+
+    // Should skip the first group with bad attributes and use the second one
+    const result = await provider.fetchUsersByRole(mockTazamaToken, 'test-group');
+    expect(result).toEqual(mockMembers);
+  });
+
+  it('should handle fetch timeout/abort scenarios', async () => {
+    const provider = new KeycloakProvider();
+
+    // Simulate an abort error
+    jest.spyOn(global, 'fetch').mockRejectedValueOnce(new Error('The operation was aborted'));
+
+    await expect(provider.fetchUserGroupDetails('test-token', 'test-group')).rejects.toThrow('Failed to fetch user group details');
+  });
+});
