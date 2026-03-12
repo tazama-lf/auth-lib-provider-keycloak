@@ -9,6 +9,7 @@ import {
   KEYCLOAK_SUBGROUP_MEMBERS_ENDPOINT,
   KEYCLOAK_TOKEN_ENDPOINT,
 } from './utils/constants';
+import { fetchWithAuth } from './utils/helper';
 
 const ZERO = 0;
 
@@ -123,13 +124,8 @@ class KeycloakProvider implements TazamaAuthProvider<[string, string], KeycloakG
    */
   async fetchUserGroupDetails(decodedToken: TazamaToken, userGroup: string): Promise<KeycloakGroup[]> {
     try {
-      const response = await fetch(KEYCLOAK_GROUP_SEARCH_ENDPOINT(this.baseUrl, this.realm, userGroup), {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${decodedToken.tokenString}`,
-        },
-      });
-      const groupDetails = (await response.json()) as KeycloakGroup[];
+      const response = await fetchWithAuth(KEYCLOAK_GROUP_SEARCH_ENDPOINT(this.baseUrl, this.realm, userGroup), decodedToken.tokenString);
+      const groupDetails = response as KeycloakGroup[];
       return groupDetails;
     } catch (error) {
       const err = error as Error;
@@ -146,13 +142,8 @@ class KeycloakProvider implements TazamaAuthProvider<[string, string], KeycloakG
    */
   async fetchSubGroups(decodedToken: TazamaToken, groupId: string): Promise<KeycloakSubGroup[]> {
     try {
-      const response = await fetch(KEYCLOAK_SUBGROUPS_ENDPOINT(this.baseUrl, this.realm, groupId), {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${decodedToken.tokenString}`,
-        },
-      });
-      const subGroupDetails = (await response.json()) as KeycloakSubGroup[];
+      const response = await fetchWithAuth(KEYCLOAK_SUBGROUPS_ENDPOINT(this.baseUrl, this.realm, groupId), decodedToken.tokenString);
+      const subGroupDetails = response as KeycloakSubGroup[];
       return subGroupDetails;
     } catch (error) {
       const err = error as Error;
@@ -169,13 +160,11 @@ class KeycloakProvider implements TazamaAuthProvider<[string, string], KeycloakG
    */
   async fetchSubGroupMembers(decodedToken: TazamaToken, subGroupId: string): Promise<KeycloakGroupMember[]> {
     try {
-      const response = await fetch(KEYCLOAK_SUBGROUP_MEMBERS_ENDPOINT(this.baseUrl, this.realm, subGroupId), {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${decodedToken.tokenString}`,
-        },
-      });
-      const members = (await response.json()) as KeycloakGroupMember[];
+      const response = await fetchWithAuth(
+        KEYCLOAK_SUBGROUP_MEMBERS_ENDPOINT(this.baseUrl, this.realm, subGroupId),
+        decodedToken.tokenString,
+      );
+      const members = response as KeycloakGroupMember[];
       return members;
     } catch (error) {
       const err = error as Error;
