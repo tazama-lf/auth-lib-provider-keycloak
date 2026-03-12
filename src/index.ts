@@ -1,13 +1,12 @@
-import type { TazamaAuthProvider } from '@tazama-lf/auth-lib';
+import type { TazamaAuthProvider, TazamaToken } from '@tazama-lf/auth-lib';
 import { KeycloakProvider } from './provider';
+import type { KeycloakGroupMember } from './interfaces/iKeycloakGroup';
 
-const keycloakProvider = new KeycloakProvider();
-
-function register(): TazamaAuthProvider<[string, string]> {
+function register(): TazamaAuthProvider<[string, string], KeycloakGroupMember[], [TazamaToken, string, string]> {
   return KeycloakProvider.prototype;
 }
 
-export { register, keycloakProvider };
+export { register };
 export type {
   KeycloakGroup,
   KeycloakSubGroup,

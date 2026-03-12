@@ -195,11 +195,13 @@ describe('Keycloak Provider - Admin API Methods', () => {
       id: 'subgroup-1',
       name: 'admin-role',
       path: '/test-group/admin-role',
+      realmRoles: ['admin-role'],
     },
     {
       id: 'subgroup-2',
       name: 'user-role',
       path: '/test-group/user-role',
+      realmRoles: ['user-role'],
     },
   ];
 
@@ -245,14 +247,14 @@ describe('Keycloak Provider - Admin API Methods', () => {
     );
 
     const provider = new KeycloakProvider();
-    const result = await provider.fetchUserGroupDetails('test-token', 'test-group');
+    const result = await provider.fetchUserGroupDetails(mockTazamaToken, 'test-group');
 
     expect(result).toEqual(mockGroups);
     expect(global.fetch).toHaveBeenCalledWith(
       expect.stringContaining('/admin/realms/tazama/groups?search=test-group'),
       expect.objectContaining({
         method: 'GET',
-        headers: { Authorization: 'Bearer test-token' },
+        headers: { Authorization: 'Bearer test-token-string' },
       }),
     );
   });
@@ -266,7 +268,7 @@ describe('Keycloak Provider - Admin API Methods', () => {
     );
 
     const provider = new KeycloakProvider();
-    await expect(provider.fetchUserGroupDetails('test-token', 'test-group')).rejects.toThrow('Failed to fetch user group details');
+    await expect(provider.fetchUserGroupDetails(mockTazamaToken, 'test-group')).rejects.toThrow('fetchUserGroupDetails retrieval failed');
   });
 
   it('should fetch sub-groups successfully', async () => {
@@ -278,14 +280,14 @@ describe('Keycloak Provider - Admin API Methods', () => {
     );
 
     const provider = new KeycloakProvider();
-    const result = await provider.fetchSubGroups('test-token', 'group-1');
+    const result = await provider.fetchSubGroups(mockTazamaToken, 'group-1');
 
     expect(result).toEqual(mockSubGroups);
     expect(global.fetch).toHaveBeenCalledWith(
       expect.stringContaining('/admin/realms/tazama/groups/group-1/children'),
       expect.objectContaining({
         method: 'GET',
-        headers: { Authorization: 'Bearer test-token' },
+        headers: { Authorization: 'Bearer test-token-string' },
       }),
     );
   });
@@ -299,10 +301,10 @@ describe('Keycloak Provider - Admin API Methods', () => {
     );
 
     const provider = new KeycloakProvider();
-    await expect(provider.fetchSubGroups('test-token', 'group-1')).rejects.toThrow('Failed to fetch sub-groups');
+    await expect(provider.fetchSubGroups(mockTazamaToken, 'group-1')).rejects.toThrow('fetchSubGroups retrieval failed');
   });
 
-  it('should fetch group members successfully', async () => {
+  it('should fetch sub-group members successfully', async () => {
     jest.spyOn(global, 'fetch').mockResolvedValueOnce(
       new Response(JSON.stringify(mockMembers), {
         status: 200,
@@ -311,19 +313,19 @@ describe('Keycloak Provider - Admin API Methods', () => {
     );
 
     const provider = new KeycloakProvider();
-    const result = await provider.fetchGroupMembers('test-token', 'group-1');
+    const result = await provider.fetchSubGroupMembers(mockTazamaToken, 'group-1');
 
     expect(result).toEqual(mockMembers);
     expect(global.fetch).toHaveBeenCalledWith(
       expect.stringContaining('/admin/realms/tazama/groups/group-1/members'),
       expect.objectContaining({
         method: 'GET',
-        headers: { Authorization: 'Bearer test-token' },
+        headers: { Authorization: 'Bearer test-token-string' },
       }),
     );
   });
 
-  it('should handle error when fetching group members fails', async () => {
+  it('should handle error when fetching sub-group members fails', async () => {
     jest.spyOn(global, 'fetch').mockResolvedValueOnce(
       new Response('Unauthorized', {
         status: 401,
@@ -332,7 +334,7 @@ describe('Keycloak Provider - Admin API Methods', () => {
     );
 
     const provider = new KeycloakProvider();
-    await expect(provider.fetchGroupMembers('test-token', 'group-1')).rejects.toThrow('Failed to fetch group members');
+    await expect(provider.fetchSubGroupMembers(mockTazamaToken, 'group-1')).rejects.toThrow('fetchSubGroupMembers retrieval failed');
   });
 
   it('should fetch users by role successfully', async () => {
@@ -347,12 +349,17 @@ describe('Keycloak Provider - Admin API Methods', () => {
         }),
       )
       .mockResolvedValueOnce(
+        new Response(JSON.stringify(mockSubGroups), {
+          status: 200,
+        }),
+      )
+      .mockResolvedValueOnce(
         new Response(JSON.stringify(mockMembers), {
           status: 200,
         }),
       );
 
-    const result = await provider.fetchUsersByRole(mockTazamaToken, 'test-group');
+    const result = await provider.fetchUsersByRole(mockTazamaToken, 'test-group', 'admin-role');
 
     expect(result).toEqual(mockMembers);
   });
@@ -393,32 +400,36 @@ describe('Keycloak Provider - Admin API Methods', () => {
       }),
     );
 
-    await expect(provider.fetchUsersByRole(mockTazamaToken, 'non-existent-group')).rejects.toThrow(
-      'No group found with the group name: non-existent-group',
+    await expect(provider.fetchUsersByRole(mockTazamaToken, 'non-existent-group', 'admin-role')).rejects.toThrow(
+      'getUsersByRole retrieval failed',
     );
   });
 
-  it('should throw error when no tenant group found', async () => {
+  it('should throw error when no sub-group found with role', async () => {
     const provider = new KeycloakProvider();
-    const groupsWithoutTenant = [
+    const subGroupsWithoutRole = [
       {
-        id: 'group-1',
-        name: 'test-group',
-        attributes: {
-          TENANT_ID: ['different-tenant'],
-        },
+        id: 'subgroup-1',
+        name: 'other-role',
+        path: '/test-group/other-role',
+        realmRoles: ['other-role'],
       },
     ];
 
-    jest.spyOn(global, 'fetch').mockResolvedValueOnce(
-      new Response(JSON.stringify(groupsWithoutTenant), {
-        status: 200,
-      }),
-    );
+    jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(mockGroups), {
+          status: 200,
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(subGroupsWithoutRole), {
+          status: 200,
+        }),
+      );
 
-    await expect(provider.fetchUsersByRole(mockTazamaToken, 'test-group')).rejects.toThrow(
-      'No group found for the tenant tenant_value_005',
-    );
+    await expect(provider.fetchUsersByRole(mockTazamaToken, 'test-group', 'admin-role')).rejects.toThrow('getUsersByRole retrieval failed');
   });
 
   it('should throw error when sub-group not found', async () => {
@@ -438,56 +449,49 @@ describe('Keycloak Provider - Admin API Methods', () => {
       );
 
     await expect(provider.fetchUsersByRole(mockTazamaToken, 'test-group', 'non-existent-role')).rejects.toThrow(
-      'No sub-group found with the role name: non-existent-role',
+      'getUsersByRole retrieval failed',
     );
   });
 
-  it('should throw error when tenant group has no sub-groups but sub-group requested', async () => {
+  it('should throw error when no sub-group with matching role found', async () => {
     const provider = new KeycloakProvider();
-    const groupWithNoSubGroups = [
+    const subGroupsEmptyRoles = [
       {
-        id: 'group-1',
-        name: 'test-group',
-        subGroupCount: 0,
-        attributes: {
-          TENANT_ID: ['tenant_value_005'],
-        },
-      },
-    ];
-
-    jest.spyOn(global, 'fetch').mockResolvedValueOnce(
-      new Response(JSON.stringify(groupWithNoSubGroups), {
-        status: 200,
-      }),
-    );
-
-    await expect(provider.fetchUsersByRole(mockTazamaToken, 'test-group', 'admin-role')).rejects.toThrow(
-      'No sub-groups found for the tenant group: group-1',
-    );
-  });
-
-  it('should handle groups with malformed attributes', async () => {
-    const provider = new KeycloakProvider();
-    const groupsWithBadAttributes = [
-      {
-        id: 'group-1',
-        name: 'test-group',
-        // attributes is null/undefined or malformed
-        attributes: null,
-      },
-      {
-        id: 'group-2',
-        name: 'test-group',
-        attributes: {
-          TENANT_ID: ['tenant_value_005'],
-        },
+        id: 'subgroup-1',
+        name: 'test-subgroup',
+        path: '/test-group/test-subgroup',
+        realmRoles: [],
       },
     ];
 
     jest
       .spyOn(global, 'fetch')
       .mockResolvedValueOnce(
-        new Response(JSON.stringify(groupsWithBadAttributes), {
+        new Response(JSON.stringify(mockGroups), {
+          status: 200,
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(subGroupsEmptyRoles), {
+          status: 200,
+        }),
+      );
+
+    await expect(provider.fetchUsersByRole(mockTazamaToken, 'test-group', 'admin-role')).rejects.toThrow('getUsersByRole retrieval failed');
+  });
+
+  it('should handle successful fetch with valid group and sub-group', async () => {
+    const provider = new KeycloakProvider();
+
+    jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(mockGroups), {
+          status: 200,
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(mockSubGroups), {
           status: 200,
         }),
       )
@@ -497,8 +501,7 @@ describe('Keycloak Provider - Admin API Methods', () => {
         }),
       );
 
-    // Should skip the first group with bad attributes and use the second one
-    const result = await provider.fetchUsersByRole(mockTazamaToken, 'test-group');
+    const result = await provider.fetchUsersByRole(mockTazamaToken, 'test-group', 'user-role');
     expect(result).toEqual(mockMembers);
   });
 
@@ -508,6 +511,6 @@ describe('Keycloak Provider - Admin API Methods', () => {
     // Simulate an abort error
     jest.spyOn(global, 'fetch').mockRejectedValueOnce(new Error('The operation was aborted'));
 
-    await expect(provider.fetchUserGroupDetails('test-token', 'test-group')).rejects.toThrow('Failed to fetch user group details');
+    await expect(provider.fetchUserGroupDetails(mockTazamaToken, 'test-group')).rejects.toThrow('fetchUserGroupDetails retrieval failed');
   });
 });
