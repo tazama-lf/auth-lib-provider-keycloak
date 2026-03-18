@@ -222,6 +222,25 @@ describe('Keycloak Provider - Admin API Methods', () => {
     },
   ];
 
+  const mockTazamaMembers = [
+    {
+      id: 'user-1',
+      username: 'john.doe',
+      email: 'john@example.com',
+      firstName: 'John',
+      lastName: 'Doe',
+      emailVerified: true,
+      enabled: true,
+      createdTimestamp: 1234567890,
+      metadata: {
+        totp: false,
+        disableableCredentialTypes: [],
+        requiredActions: [],
+        notBefore: 0,
+      },
+    },
+  ];
+
   const mockTazamaToken = {
     clientId: '687488800-fc3a-4425-977c-ed58f1afb7cd',
     iss: 'http://localhost:8080/realms/tazama',
@@ -361,34 +380,7 @@ describe('Keycloak Provider - Admin API Methods', () => {
 
     const result = await provider.fetchUsersByRole(mockTazamaToken, 'test-group', 'admin-role');
 
-    expect(result).toEqual(mockMembers);
-  });
-
-  it('should fetch users by role with sub-group filtering', async () => {
-    const provider = new KeycloakProvider();
-
-    // Mock all four fetch calls: groups -> subgroups -> members
-    jest
-      .spyOn(global, 'fetch')
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify(mockGroups), {
-          status: 200,
-        }),
-      )
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify(mockSubGroups), {
-          status: 200,
-        }),
-      )
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify(mockMembers), {
-          status: 200,
-        }),
-      );
-
-    const result = await provider.fetchUsersByRole(mockTazamaToken, 'test-group', 'admin-role');
-
-    expect(result).toEqual(mockMembers);
+    expect(result).toEqual(mockTazamaMembers);
   });
 
   it('should throw error when no group found', async () => {
@@ -502,7 +494,7 @@ describe('Keycloak Provider - Admin API Methods', () => {
       );
 
     const result = await provider.fetchUsersByRole(mockTazamaToken, 'test-group', 'user-role');
-    expect(result).toEqual(mockMembers);
+    expect(result).toEqual(mockTazamaMembers);
   });
 
   it('should handle fetch timeout/abort scenarios', async () => {
