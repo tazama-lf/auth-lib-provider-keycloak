@@ -1,5 +1,5 @@
 import type { KeycloakAuthToken, KeycloakJwtToken } from './interfaces/iKeycloakToken';
-import { JwtService, type TazamaAuthProvider, type TazamaToken } from '@tazama-lf/auth-lib';
+import { JwtService, type TazamaAuthProvider, type TazamaToken, type TazamaUser } from '@tazama-lf/auth-lib';
 import jwt from 'jsonwebtoken';
 import { keycloakConfig } from './interfaces/iKeycloakConfig';
 import type { KeycloakGroup, KeycloakSubGroup, KeycloakGroupMember } from './interfaces/iKeycloakGroup';
@@ -13,7 +13,7 @@ import { fetchWithAuth } from './utils/helper';
 
 const ZERO = 0;
 
-class KeycloakProvider implements TazamaAuthProvider<[string, string], KeycloakGroupMember[], [TazamaToken, string, string]> {
+class KeycloakProvider implements TazamaAuthProvider<[string, string]> {
   private readonly realm: string;
   private readonly baseUrl: string;
 
@@ -180,7 +180,7 @@ class KeycloakProvider implements TazamaAuthProvider<[string, string], KeycloakG
    * @param {string} [subGroupRoleName] - Optional sub-group/role name to filter by
    * @returns {Promise<KeycloakGroupMember[]>} - A promise that resolves to an array of group members
    */
-  async fetchUsersByRole(decodedToken: TazamaToken, userGroup: string, roleName: string): Promise<KeycloakGroupMember[]> {
+  async fetchUsersByRole(decodedToken: TazamaToken, userGroup: string, roleName: string): Promise<TazamaUser[]> {
     const FIRST_INDEX = 0;
     try {
       const groupDetails = await this.fetchUserGroupDetails(decodedToken, userGroup);
@@ -194,11 +194,30 @@ class KeycloakProvider implements TazamaAuthProvider<[string, string], KeycloakG
         throw new Error(`No sub-group found with role: ${roleName}`);
       }
       const subGroupMembers = await this.fetchSubGroupMembers(decodedToken, subGroupId);
-      return subGroupMembers;
+      return subGroupMembers.map((member) => this.mapToTazamaUser(member));
     } catch (error) {
       const err = error as Error;
       throw new Error('getUsersByRole retrieval failed', { cause: err });
     }
+  }
+
+  private mapToTazamaUser(keyCloakUser: KeycloakGroupMember): TazamaUser {
+    return {
+      id: keyCloakUser.id,
+      username: keyCloakUser.username,
+      firstName: keyCloakUser.firstName,
+      lastName: keyCloakUser.lastName,
+      email: keyCloakUser.email,
+      emailVerified: keyCloakUser.emailVerified,
+      enabled: keyCloakUser.enabled,
+      createdTimestamp: keyCloakUser.createdTimestamp,
+      metadata: {
+        totp: keyCloakUser.totp,
+        disableableCredentialTypes: keyCloakUser.disableableCredentialTypes,
+        requiredActions: keyCloakUser.requiredActions,
+        notBefore: keyCloakUser.notBefore,
+      },
+    };
   }
 }
 export { KeycloakProvider };
