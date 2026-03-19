@@ -1,7 +1,17 @@
 import type { KeycloakAuthToken, KeycloakJwtToken } from './interfaces/iKeycloakToken';
-import { JwtService, type TazamaAuthProvider, type TazamaToken } from '@tazama-lf/auth-lib';
+import { JwtService, type TazamaAuthProvider, type TazamaToken, type TazamaUser } from '@tazama-lf/auth-lib';
 import jwt from 'jsonwebtoken';
 import { keycloakConfig } from './interfaces/iKeycloakConfig';
+import type { KeycloakGroup, KeycloakSubGroup, KeycloakGroupMember } from './interfaces/iKeycloakGroup';
+import {
+  KEYCLOAK_GROUP_SEARCH_ENDPOINT,
+  KEYCLOAK_SUBGROUPS_ENDPOINT,
+  KEYCLOAK_SUBGROUP_MEMBERS_ENDPOINT,
+  KEYCLOAK_TOKEN_ENDPOINT,
+} from './utils/constants';
+import { fetchWithAuth } from './utils/helper';
+
+const ZERO = 0;
 
 class KeycloakProvider implements TazamaAuthProvider<[string, string]> {
   private readonly realm: string;
@@ -32,7 +42,7 @@ class KeycloakProvider implements TazamaAuthProvider<[string, string]> {
     form.append('grant_type', 'password');
     const myHeaders = new Headers();
     myHeaders.append('Content-Type', 'application/x-www-form-urlencoded');
-    const res = await fetch(`${this.baseUrl}/realms/${this.realm}/protocol/openid-connect/token`, {
+    const res = await fetch(KEYCLOAK_TOKEN_ENDPOINT(this.baseUrl, this.realm), {
       method: 'POST',
       body: form,
       headers: myHeaders,
@@ -103,6 +113,111 @@ class KeycloakProvider implements TazamaAuthProvider<[string, string]> {
       }
     }
     return roles;
+  }
+
+  /**
+   * Fetches user group details from Keycloak admin API based on group name search
+   *
+   * @param {string} tokenString - The access token string for authorization
+   * @param {string} userGroup - The group name to search for
+   * @returns {Promise<KeycloakGroup[]>} - A promise that resolves to an array of matching groups
+   */
+  async fetchUserGroupDetails(decodedToken: TazamaToken, userGroup: string): Promise<KeycloakGroup[]> {
+    try {
+      const response = await fetchWithAuth(KEYCLOAK_GROUP_SEARCH_ENDPOINT(this.baseUrl, this.realm, userGroup), decodedToken.tokenString);
+      const groupDetails = response as KeycloakGroup[];
+      return groupDetails;
+    } catch (error) {
+      const err = error as Error;
+      throw new Error('fetchUserGroupDetails retrieval failed', { cause: err });
+    }
+  }
+
+  /**
+   * Fetches sub-groups (children) of a specific group from Keycloak admin API
+   *
+   * @param {string} tokenString - The access token string for authorization
+   * @param {string} groupId - The parent group ID
+   * @returns {Promise<KeycloakSubGroup[]>} - A promise that resolves to an array of sub-groups
+   */
+  async fetchSubGroups(decodedToken: TazamaToken, groupId: string): Promise<KeycloakSubGroup[]> {
+    try {
+      const response = await fetchWithAuth(KEYCLOAK_SUBGROUPS_ENDPOINT(this.baseUrl, this.realm, groupId), decodedToken.tokenString);
+      const subGroupDetails = response as KeycloakSubGroup[];
+      return subGroupDetails;
+    } catch (error) {
+      const err = error as Error;
+      throw new Error('fetchSubGroups retrieval failed', { cause: err });
+    }
+  }
+
+  /**
+   * Fetches members of a specific group from Keycloak admin API
+   *
+   * @param {string} tokenString - The access token string for authorization
+   * @param {string} groupId - The group ID to fetch members from
+   * @returns {Promise<KeycloakGroupMember[]>} - A promise that resolves to an array of group members
+   */
+  async fetchSubGroupMembers(decodedToken: TazamaToken, subGroupId: string): Promise<KeycloakGroupMember[]> {
+    try {
+      const response = await fetchWithAuth(
+        KEYCLOAK_SUBGROUP_MEMBERS_ENDPOINT(this.baseUrl, this.realm, subGroupId),
+        decodedToken.tokenString,
+      );
+      const members = response as KeycloakGroupMember[];
+      return members;
+    } catch (error) {
+      const err = error as Error;
+      throw new Error(`fetchSubGroupMembers retrieval failed: ${err.message}`);
+    }
+  }
+
+  /**
+   * Fetches users by role from Keycloak groups with tenant filtering
+   *
+   * @param {TazamaToken} decodedToken - The decoded Tazama token containing tenant information
+   * @param {string} groupName - The name of the group to search for
+   * @param {string} [subGroupRoleName] - Optional sub-group/role name to filter by
+   * @returns {Promise<KeycloakGroupMember[]>} - A promise that resolves to an array of group members
+   */
+  async fetchUsersByRole(decodedToken: TazamaToken, userGroup: string, roleName: string): Promise<TazamaUser[]> {
+    const FIRST_INDEX = 0;
+    try {
+      const groupDetails = await this.fetchUserGroupDetails(decodedToken, userGroup);
+
+      if (groupDetails.length === ZERO) {
+        throw new Error(`No group found with the group name: ${userGroup}`);
+      }
+      const subGroups = await this.fetchSubGroups(decodedToken, groupDetails[FIRST_INDEX].id ?? '');
+      const subGroupId = subGroups.find((group: KeycloakSubGroup) => group.realmRoles?.includes(roleName))?.id;
+      if (!subGroupId) {
+        throw new Error(`No sub-group found with role: ${roleName}`);
+      }
+      const subGroupMembers = await this.fetchSubGroupMembers(decodedToken, subGroupId);
+      return subGroupMembers.map((member) => this.mapToTazamaUser(member));
+    } catch (error) {
+      const err = error as Error;
+      throw new Error('getUsersByRole retrieval failed', { cause: err });
+    }
+  }
+
+  private mapToTazamaUser(keyCloakUser: KeycloakGroupMember): TazamaUser {
+    return {
+      id: keyCloakUser.id,
+      username: keyCloakUser.username,
+      firstName: keyCloakUser.firstName,
+      lastName: keyCloakUser.lastName,
+      email: keyCloakUser.email,
+      emailVerified: keyCloakUser.emailVerified,
+      enabled: keyCloakUser.enabled,
+      createdTimestamp: keyCloakUser.createdTimestamp,
+      metadata: {
+        totp: keyCloakUser.totp,
+        disableableCredentialTypes: keyCloakUser.disableableCredentialTypes,
+        requiredActions: keyCloakUser.requiredActions,
+        notBefore: keyCloakUser.notBefore,
+      },
+    };
   }
 }
 export { KeycloakProvider };
