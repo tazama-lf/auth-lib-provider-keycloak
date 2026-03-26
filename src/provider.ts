@@ -1,5 +1,5 @@
 import type { KeycloakAuthToken, KeycloakJwtToken } from './interfaces/iKeycloakToken';
-import { JwtService, type TazamaAuthProvider, type TazamaToken } from '@tazama-lf/auth-lib';
+import { JwtService, type TazamaAuthProvider, type TazamaToken, type TazamaUser } from '@tazama-lf/auth-lib';
 import jwt from 'jsonwebtoken';
 import { keycloakConfig } from './interfaces/iKeycloakConfig';
 import type { KeycloakGroup, KeycloakSubGroup, KeycloakGroupMember } from './interfaces/iKeycloakGroup';
@@ -11,26 +11,9 @@ import {
 } from './utils/constants';
 import { fetchWithAuth } from './utils/helper';
 
-export interface TazamaUser {
-  id: string;
-  username: string;
-  firstName?: string;
-  lastName?: string;
-  email?: string;
-  emailVerified: boolean;
-  enabled: boolean;
-  createdTimestamp: number;
-  metadata: {
-    totp: boolean;
-    disableableCredentialTypes: string[];
-    requiredActions: string[];
-    notBefore: number;
-  };
-}
-
 const ZERO = 0;
 
-class KeycloakProvider implements TazamaAuthProvider<[string, string], TazamaUser[], [TazamaToken, string, string]> {
+class KeycloakProvider implements TazamaAuthProvider<[string, string]> {
   private readonly realm: string;
   private readonly baseUrl: string;
 
