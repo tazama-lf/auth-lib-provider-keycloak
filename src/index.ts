@@ -1,7 +1,7 @@
-import type { TazamaAuthProvider } from '@tazama-lf/auth-lib';
-import { KeycloakProvider } from './provider';
+import type { TazamaAuthProvider, TazamaToken } from '@tazama-lf/auth-lib';
+import { KeycloakProvider, type TazamaUser } from './provider';
 
-function register(): TazamaAuthProvider<[string, string]> {
+function register(): TazamaAuthProvider<[string, string], TazamaUser[], [TazamaToken, string, string]> {
   return KeycloakProvider.prototype;
 }
 
