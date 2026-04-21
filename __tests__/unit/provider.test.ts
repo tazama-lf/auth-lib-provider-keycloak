@@ -219,6 +219,9 @@ describe('Keycloak Provider - Admin API Methods', () => {
       disableableCredentialTypes: [],
       requiredActions: [],
       notBefore: 0,
+      attributes: {
+        TENANT_ID: ['tenant_value_005'],
+      },
     },
   ];
 
