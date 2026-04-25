@@ -194,7 +194,8 @@ class KeycloakProvider implements TazamaAuthProvider<[string, string]> {
         throw new Error(`No sub-group found with role: ${roleName}`);
       }
       const subGroupMembers = await this.fetchSubGroupMembers(decodedToken, subGroupId);
-      return subGroupMembers.map((member) => this.mapToTazamaUser(member));
+      const tenantMembers = subGroupMembers.filter((member) => member.attributes?.TENANT_ID?.includes(decodedToken.tenantId));
+      return tenantMembers.map((member) => this.mapToTazamaUser(member));
     } catch (error) {
       const err = error as Error;
       throw new Error('getUsersByRole retrieval failed', { cause: err });

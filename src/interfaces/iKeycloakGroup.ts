@@ -41,4 +41,8 @@ export interface KeycloakGroupMember {
   disableableCredentialTypes: string[];
   requiredActions: string[];
   notBefore: number;
+  attributes?: {
+    TENANT_ID?: string[];
+    [key: string]: string[] | undefined;
+  };
 }
