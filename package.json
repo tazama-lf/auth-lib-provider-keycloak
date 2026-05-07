@@ -1,6 +1,6 @@
 {
   "name": "@tazama-lf/auth-lib-provider-keycloak",
-  "version": "4.0.0-rc.10",
+  "version": "4.0.0-rc.11",
   "description": "Keycloak provider for auth-lib",
   "main": "lib/index.js",
   "scripts": {
