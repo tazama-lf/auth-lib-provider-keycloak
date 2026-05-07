@@ -184,9 +184,6 @@ describe('Keycloak Provider - Admin API Methods', () => {
       name: 'test-group',
       path: '/test-group',
       subGroupCount: 2,
-      attributes: {
-        TENANT_ID: ['tenant_value_005'],
-      },
     },
   ];
 
@@ -196,12 +193,18 @@ describe('Keycloak Provider - Admin API Methods', () => {
       name: 'admin-role',
       path: '/test-group/admin-role',
       realmRoles: ['admin-role'],
+      attributes: {
+        TENANT_ID: ['tenant_value_005'],
+      },
     },
     {
       id: 'subgroup-2',
       name: 'user-role',
       path: '/test-group/user-role',
       realmRoles: ['user-role'],
+      attributes: {
+        TENANT_ID: ['tenant_value_005'],
+      },
     },
   ];
 

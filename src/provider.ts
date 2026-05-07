@@ -189,13 +189,13 @@ class KeycloakProvider implements TazamaAuthProvider<[string, string]> {
         throw new Error(`No group found with the group name: ${userGroup}`);
       }
       const subGroups = await this.fetchSubGroups(decodedToken, groupDetails[FIRST_INDEX].id ?? '');
-      const subGroupId = subGroups.find((group: KeycloakSubGroup) => group.realmRoles?.includes(roleName))?.id;
+      const tenantSpecificSubGroups = subGroups.filter((group) => group.attributes?.TENANT_ID?.includes(decodedToken.tenantId));
+      const subGroupId = tenantSpecificSubGroups.find((group: KeycloakSubGroup) => group.name === roleName)?.id;
       if (!subGroupId) {
         throw new Error(`No sub-group found with role: ${roleName}`);
       }
       const subGroupMembers = await this.fetchSubGroupMembers(decodedToken, subGroupId);
-      const tenantMembers = subGroupMembers.filter((member) => member.attributes?.TENANT_ID?.includes(decodedToken.tenantId));
-      return tenantMembers.map((member) => this.mapToTazamaUser(member));
+      return subGroupMembers.map((member) => this.mapToTazamaUser(member));
     } catch (error) {
       const err = error as Error;
       throw new Error('getUsersByRole retrieval failed', { cause: err });
