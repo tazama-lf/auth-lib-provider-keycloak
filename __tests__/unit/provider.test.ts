@@ -218,6 +218,17 @@ describe('Keycloak Provider - Admin API Methods', () => {
     },
   ];
 
+  const mockUserRoleTenantSubGroups = [
+    {
+      id: 'tenant-subgroup-2',
+      name: 'tenant_value_005',
+      path: '/test-group/user-role/tenant_value_005',
+      attributes: {
+        TENANT_ID: ['tenant_value_005'],
+      },
+    },
+  ];
+
   const mockMembers = [
     {
       id: 'user-1',
@@ -461,9 +472,10 @@ describe('Keycloak Provider - Admin API Methods', () => {
         }),
       );
 
-    await expect(provider.fetchUsersByRole(mockTazamaToken, 'test-group', 'non-existent-role')).rejects.toThrow(
-      'getUsersByRole retrieval failed',
-    );
+    await expect(provider.fetchUsersByRole(mockTazamaToken, 'test-group', 'non-existent-role')).rejects.toMatchObject({
+      message: 'getUsersByRole retrieval failed',
+      cause: { message: 'No sub-group found with role: non-existent-role' },
+    });
   });
 
   it('should throw error when no sub-group with matching role found', async () => {
@@ -509,7 +521,7 @@ describe('Keycloak Provider - Admin API Methods', () => {
         }),
       )
       .mockResolvedValueOnce(
-        new Response(JSON.stringify(mockTenantSubGroups), {
+        new Response(JSON.stringify(mockUserRoleTenantSubGroups), {
           status: 200,
         }),
       )
@@ -521,6 +533,14 @@ describe('Keycloak Provider - Admin API Methods', () => {
 
     const result = await provider.fetchUsersByRole(mockTazamaToken, 'test-group', 'user-role');
     expect(result).toEqual(mockTazamaMembers);
+    expect(global.fetch).toHaveBeenNthCalledWith(
+      3,
+      expect.stringContaining('/groups/subgroup-2/children'),
+      expect.objectContaining({
+        method: 'GET',
+        headers: { Authorization: 'Bearer test-token-string' },
+      }),
+    );
   });
 
   it('should handle fetch timeout/abort scenarios', async () => {
@@ -590,7 +610,10 @@ describe('Keycloak Provider - Admin API Methods', () => {
         }),
       );
 
-    await expect(provider.fetchUsersByRole(mockTazamaToken, 'test-group', 'admin-role')).rejects.toThrow('getUsersByRole retrieval failed');
+    await expect(provider.fetchUsersByRole(mockTazamaToken, 'test-group', 'admin-role')).rejects.toMatchObject({
+      message: 'getUsersByRole retrieval failed',
+      cause: { message: 'No tenant sub-group found for tenant: tenant_value_005' },
+    });
   });
 
   it('should map Keycloak user to TazamaUser correctly', async () => {
