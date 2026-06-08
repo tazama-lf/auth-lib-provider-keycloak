@@ -25,6 +25,7 @@ export interface KeycloakGroup {
 export interface KeycloakSubGroup extends KeycloakGroup {
   parentId?: string;
   realmRoles?: string[];
+  attributes?: GroupAttribute;
   clientRoles?: Record<string, string[]>;
 }
 

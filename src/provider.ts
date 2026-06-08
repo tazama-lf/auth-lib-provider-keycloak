@@ -79,6 +79,11 @@ class KeycloakProvider implements TazamaAuthProvider<[string, string]> {
       throw new Error(`Token is missing required properties: sub: ${decodedToken.sub}, iss: ${decodedToken.iss}, exp: ${decodedToken.exp}`);
     }
 
+    // Ensure tenant_id is present - if missing, the user is misconfigured in Keycloak
+    if (!decodedToken.tenant_id) {
+      throw new Error('Token is missing required tenant_id claim');
+    }
+
     decodedToken.sid ??= 'auth-lib-provider-keycloak';
 
     return {
@@ -88,7 +93,7 @@ class KeycloakProvider implements TazamaAuthProvider<[string, string]> {
       exp: decodedToken.exp,
       tokenString: authToken.accessToken,
       claims: this.mapTazamaRoles(decodedToken), // Pass the typed token here
-      tenantId: decodedToken.tenant_id ?? 'DEFAULT',
+      tenantId: decodedToken.tenant_id,
     };
   }
 
@@ -188,14 +193,26 @@ class KeycloakProvider implements TazamaAuthProvider<[string, string]> {
       if (groupDetails.length === ZERO) {
         throw new Error(`No group found with the group name: ${userGroup}`);
       }
-      const subGroups = await this.fetchSubGroups(decodedToken, groupDetails[FIRST_INDEX].id ?? '');
-      const subGroupId = subGroups.find((group: KeycloakSubGroup) => group.realmRoles?.includes(roleName))?.id;
-      if (!subGroupId) {
+
+      // Tier 2 - Get role groups
+      const tier2Groups = await this.fetchSubGroups(decodedToken, groupDetails[FIRST_INDEX].id ?? '');
+      const roleGroup = tier2Groups.find((group: KeycloakSubGroup) => group.name === roleName);
+
+      if (!roleGroup?.id) {
         throw new Error(`No sub-group found with role: ${roleName}`);
       }
-      const subGroupMembers = await this.fetchSubGroupMembers(decodedToken, subGroupId);
-      const tenantMembers = subGroupMembers.filter((member) => member.attributes?.TENANT_ID?.includes(decodedToken.tenantId));
-      return tenantMembers.map((member) => this.mapToTazamaUser(member));
+
+      // Tier 3 - Get tenant subgroups under the role group
+      const tier3Groups = await this.fetchSubGroups(decodedToken, roleGroup.id);
+      const tenantGroup = tier3Groups.find((group: KeycloakSubGroup) => group.attributes?.TENANT_ID?.includes(decodedToken.tenantId));
+
+      if (!tenantGroup?.id) {
+        throw new Error(`No tenant sub-group found for tenant: ${decodedToken.tenantId}`);
+      }
+
+      // Get members from the tenant-specific subgroup
+      const subGroupMembers = await this.fetchSubGroupMembers(decodedToken, tenantGroup.id);
+      return subGroupMembers.map((member) => this.mapToTazamaUser(member));
     } catch (error) {
       const err = error as Error;
       throw new Error('getUsersByRole retrieval failed', { cause: err });

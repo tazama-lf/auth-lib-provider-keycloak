@@ -88,13 +88,13 @@ describe('Keycloak Provider', () => {
     jest.spyOn(jwt, 'decode').mockRestore();
   });
 
-  it('should handle token with missing optional fields (sid, tenant_id)', async () => {
+  it('should throw error when tenant_id is missing from token', async () => {
     jest.spyOn(jwt, 'decode').mockImplementationOnce(() => {
       return {
         sub: '687488800-fc3a-4425-977c-ed58f1afb7cd', // Required field
         iss: 'http://localhost:8080/realms/tazama', // Required field
         exp: 1753094140, // Required field
-        // sid and tenant_id are missing to test fallback values
+        // tenant_id is missing - should cause an error
         resource_access: {
           account: { roles: ['manage-account'] },
         },
@@ -105,9 +105,14 @@ describe('Keycloak Provider', () => {
     });
 
     const provider = new KeycloakProvider();
-    const token = await provider.getToken('testUser', 'testPassword');
 
-    expect(token).toEqual(jwtSignVal);
+    try {
+      await provider.getToken('testUser', 'testPassword');
+      throw new Error('UNREACHABLE');
+    } catch (err) {
+      expect(err).toEqual(new Error('Token is missing required tenant_id claim'));
+    }
+
     jest.spyOn(jwt, 'decode').mockRestore();
   });
 
@@ -184,9 +189,6 @@ describe('Keycloak Provider - Admin API Methods', () => {
       name: 'test-group',
       path: '/test-group',
       subGroupCount: 2,
-      attributes: {
-        TENANT_ID: ['tenant_value_005'],
-      },
     },
   ];
 
@@ -202,6 +204,28 @@ describe('Keycloak Provider - Admin API Methods', () => {
       name: 'user-role',
       path: '/test-group/user-role',
       realmRoles: ['user-role'],
+    },
+  ];
+
+  const mockTenantSubGroups = [
+    {
+      id: 'tenant-subgroup-1',
+      name: 'tenant_value_005',
+      path: '/test-group/admin-role/tenant_value_005',
+      attributes: {
+        TENANT_ID: ['tenant_value_005'],
+      },
+    },
+  ];
+
+  const mockUserRoleTenantSubGroups = [
+    {
+      id: 'tenant-subgroup-2',
+      name: 'tenant_value_005',
+      path: '/test-group/user-role/tenant_value_005',
+      attributes: {
+        TENANT_ID: ['tenant_value_005'],
+      },
     },
   ];
 
@@ -362,7 +386,7 @@ describe('Keycloak Provider - Admin API Methods', () => {
   it('should fetch users by role successfully', async () => {
     const provider = new KeycloakProvider();
 
-    // Mock the three fetch calls needed for fetchUsersByRole
+    // Mock the four fetch calls needed for fetchUsersByRole
     jest
       .spyOn(global, 'fetch')
       .mockResolvedValueOnce(
@@ -372,6 +396,11 @@ describe('Keycloak Provider - Admin API Methods', () => {
       )
       .mockResolvedValueOnce(
         new Response(JSON.stringify(mockSubGroups), {
+          status: 200,
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(mockTenantSubGroups), {
           status: 200,
         }),
       )
@@ -443,9 +472,10 @@ describe('Keycloak Provider - Admin API Methods', () => {
         }),
       );
 
-    await expect(provider.fetchUsersByRole(mockTazamaToken, 'test-group', 'non-existent-role')).rejects.toThrow(
-      'getUsersByRole retrieval failed',
-    );
+    await expect(provider.fetchUsersByRole(mockTazamaToken, 'test-group', 'non-existent-role')).rejects.toMatchObject({
+      message: 'getUsersByRole retrieval failed',
+      cause: { message: 'No sub-group found with role: non-existent-role' },
+    });
   });
 
   it('should throw error when no sub-group with matching role found', async () => {
@@ -491,6 +521,11 @@ describe('Keycloak Provider - Admin API Methods', () => {
         }),
       )
       .mockResolvedValueOnce(
+        new Response(JSON.stringify(mockUserRoleTenantSubGroups), {
+          status: 200,
+        }),
+      )
+      .mockResolvedValueOnce(
         new Response(JSON.stringify(mockMembers), {
           status: 200,
         }),
@@ -498,6 +533,14 @@ describe('Keycloak Provider - Admin API Methods', () => {
 
     const result = await provider.fetchUsersByRole(mockTazamaToken, 'test-group', 'user-role');
     expect(result).toEqual(mockTazamaMembers);
+    expect(global.fetch).toHaveBeenNthCalledWith(
+      3,
+      expect.stringContaining('/groups/subgroup-2/children'),
+      expect.objectContaining({
+        method: 'GET',
+        headers: { Authorization: 'Bearer test-token-string' },
+      }),
+    );
   });
 
   it('should handle fetch timeout/abort scenarios', async () => {
@@ -507,5 +550,130 @@ describe('Keycloak Provider - Admin API Methods', () => {
     jest.spyOn(global, 'fetch').mockRejectedValueOnce(new Error('The operation was aborted'));
 
     await expect(provider.fetchUserGroupDetails(mockTazamaToken, 'test-group')).rejects.toThrow('fetchUserGroupDetails retrieval failed');
+  });
+
+  it('should throw error when no matching role group found', async () => {
+    const provider = new KeycloakProvider();
+    const subGroupsWithoutMatchingRole = [
+      {
+        id: 'subgroup-other',
+        name: 'other-role',
+        path: '/test-group/other-role',
+        realmRoles: ['other-role'],
+      },
+    ];
+
+    jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(mockGroups), {
+          status: 200,
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(subGroupsWithoutMatchingRole), {
+          status: 200,
+        }),
+      );
+
+    await expect(provider.fetchUsersByRole(mockTazamaToken, 'test-group', 'admin-role')).rejects.toThrow('getUsersByRole retrieval failed');
+  });
+
+  it('should throw error when tenant subgroup not found', async () => {
+    const provider = new KeycloakProvider();
+    const tenantSubGroupsWithWrongTenant = [
+      {
+        id: 'tenant-subgroup-wrong',
+        name: 'different_tenant',
+        path: '/test-group/admin-role/different_tenant',
+        attributes: {
+          TENANT_ID: ['different_tenant_id'],
+        },
+      },
+    ];
+
+    jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(mockGroups), {
+          status: 200,
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(mockSubGroups), {
+          status: 200,
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(tenantSubGroupsWithWrongTenant), {
+          status: 200,
+        }),
+      );
+
+    await expect(provider.fetchUsersByRole(mockTazamaToken, 'test-group', 'admin-role')).rejects.toMatchObject({
+      message: 'getUsersByRole retrieval failed',
+      cause: { message: 'No tenant sub-group found for tenant: tenant_value_005' },
+    });
+  });
+
+  it('should map Keycloak user to TazamaUser correctly', async () => {
+    const provider = new KeycloakProvider();
+    const memberWithAllFields = {
+      id: 'user-complete',
+      username: 'complete.user',
+      email: 'complete@example.com',
+      firstName: 'Complete',
+      lastName: 'User',
+      emailVerified: true,
+      enabled: true,
+      createdTimestamp: 9876543210,
+      totp: true,
+      disableableCredentialTypes: ['password'],
+      requiredActions: ['UPDATE_PASSWORD'],
+      notBefore: 12345,
+    };
+
+    jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(mockGroups), {
+          status: 200,
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(mockSubGroups), {
+          status: 200,
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(mockTenantSubGroups), {
+          status: 200,
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify([memberWithAllFields]), {
+          status: 200,
+        }),
+      );
+
+    const result = await provider.fetchUsersByRole(mockTazamaToken, 'test-group', 'admin-role');
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toEqual({
+      id: 'user-complete',
+      username: 'complete.user',
+      email: 'complete@example.com',
+      firstName: 'Complete',
+      lastName: 'User',
+      emailVerified: true,
+      enabled: true,
+      createdTimestamp: 9876543210,
+      metadata: {
+        totp: true,
+        disableableCredentialTypes: ['password'],
+        requiredActions: ['UPDATE_PASSWORD'],
+        notBefore: 12345,
+      },
+    });
   });
 });
