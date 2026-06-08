@@ -12,7 +12,7 @@ export const KEYCLOAK_GROUP_MEMBERS_ENDPOINT = (baseUrl: string, realm: string, 
   `${adminBase(baseUrl, realm)}/groups/${groupId}/members`;
 
 export const KEYCLOAK_SUBGROUPS_ENDPOINT = (baseUrl: string, realm: string, groupId: string): string =>
-  `${adminBase(baseUrl, realm)}/groups/${groupId}/children?briefRepresentation=false`;
+  `${adminBase(baseUrl, realm)}/groups/${groupId}/children?briefRepresentation=false&max=100`;
 
 export const KEYCLOAK_USERS_ENDPOINT = (baseUrl: string, realm: string): string => `${adminBase(baseUrl, realm)}/users`;
 
